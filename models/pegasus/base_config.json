@@ -1,0 +1,22 @@
+{
+  "emb_size": 768,
+  "feedforward_size": 3072,
+  "hidden_size": 768,
+  "hidden_act": "relu",
+  "heads_num": 12,
+  "layers_num": 12,
+  "max_seq_length": 1024,
+  "dropout": 0.1,
+  "data_processor": "gsg",
+  "embedding": ["word", "sinusoidalpos"],
+  "remove_embedding_layernorm": true,
+  "tgt_embedding": ["word", "sinusoidalpos"],
+  "share_embedding": true,
+  "encoder": "transformer",
+  "mask": "fully_visible",
+  "layernorm_positioning": "pre",
+  "decoder": "transformer",
+  "target": ["lm"],
+  "has_lmtarget_bias": true,
+  "tie_weights": true
+}

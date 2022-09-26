@@ -1,0 +1,224 @@
+def model_opts(parser):
+    parser.add_argument("--embedding", choices=["word", "pos", "seg", "sinusoidalpos", "patch", "speech", "word_patch", "dual"], default="word", nargs='+',
+                        help="Embedding type.")
+    parser.add_argument("--tgt_embedding", choices=["word", "pos", "seg", "sinusoidalpos", "patch", "speech", "word_patch", "dual"], default="word", nargs='+',
+                        help="Target embedding type.")
+    parser.add_argument("--max_seq_length", type=int, default=512,
+                        help="Max sequence length for word embedding.")
+    parser.add_argument("--relative_position_embedding", action="store_true",
+                        help="Use relative position embedding.")
+    parser.add_argument("--share_embedding", action="store_true",
+                        help="Shared embedding and target embedding parameters.")
+    parser.add_argument("--remove_embedding_layernorm", action="store_true",
+                        help="Remove layernorm on embedding.")
+    parser.add_argument("--factorized_embedding_parameterization", action="store_true", help="Factorized embedding parameterization.")
+    parser.add_argument("--encoder", choices=["transformer", "rnn", "lstm", "gru", "birnn",
+                                              "bilstm", "bigru", "gatedcnn", "dual"],
+                        default="transformer", help="Encoder type.")
+    parser.add_argument("--decoder", choices=[None, "transformer"], default=None, help="Decoder type.")
+    parser.add_argument("--mask", choices=["fully_visible", "causal", "causal_with_prefix"], default="fully_visible",
+                        help="Mask type.")
+    parser.add_argument("--layernorm_positioning", choices=["pre", "post"], default="post",
+                        help="Layernorm positioning.")
+    parser.add_argument("--feed_forward", choices=["dense", "gated"], default="dense",
+                        help="Feed forward type, specific to transformer model.")
+    parser.add_argument("--relative_attention_buckets_num", type=int, default=32,
+                        help="Buckets num of relative position embedding.")
+    parser.add_argument("--remove_attention_scale", action="store_true",
+                        help="Remove attention scale.")
+    parser.add_argument("--remove_transformer_bias", action="store_true",
+                        help="Remove bias on transformer layers.")
+    parser.add_argument("--layernorm", choices=["normal", "t5"], default="normal",
+                        help="Layernorm type.")
+    parser.add_argument("--bidirectional", action="store_true", help="Specific to recurrent model.")
+    parser.add_argument("--parameter_sharing", action="store_true", help="Parameter sharing.")
+    parser.add_argument("--has_residual_attention", action="store_true", help="Add residual attention.")
+    parser.add_argument("--has_lmtarget_bias", action="store_true",
+                        help="Add bias on output_layer for lm target.")
+    parser.add_argument("--target", choices=["sp", "lm", "mlm", "bilm", "cls", "clr"], default="mlm", nargs='+',
+                        help="The training target of the pretraining model.")
+    parser.add_argument("--tie_weights", action="store_true",
+                        help="Tie the word embedding and softmax weights.")
+    parser.add_argument("--pooling", choices=["mean", "max", "first", "last"], default="first",
+                        help="Pooling type.")
+
+    vision_opts(parser)
+    audio_opts(parser)
+
+
+def vision_opts(parser):
+    parser.add_argument("--image_height", type=int, default=256,
+                        help="image_height.")
+    parser.add_argument("--image_width", type=int, default=256,
+                        help="image_width.")
+    parser.add_argument("--patch_size", type=int, default=16,
+                        help="patch_size.")
+    parser.add_argument("--channels_num", type=int, default=3,
+                        help="Channels num.")
+    parser.add_argument("--image_preprocess", type=str, default=["crop", "normalize"], nargs='+',
+                        help="Preprocess and data augmentation methods. Choices: [\"crop\", \"horizontal_flip\", \"normalize\"]. ")
+
+
+def audio_opts(parser):
+    parser.add_argument("--sampling_rate", type=int, default=16000,
+                        help="The sampling rate at which the audio files should be digitalized expressed in Hertz per second (Hz).")
+    parser.add_argument("--audio_preprocess", type=str, default=["normalize_means", "normalize_vars", "ceptral_normalize"], nargs='+',
+                        help="Preprocess and data augmentation methods. Choices: [\"normalize_means\", \"normalize_vars\", \"ceptral_normalize\"]. ")
+    parser.add_argument("--max_audio_frames", type=int, default=6000,
+                        help="Maximum frames of an utterance.")
+    # For audio convolutional subsampler
+    parser.add_argument("--conv_layers_num", type=int, default=2,
+                        help="Convolutional layers.")
+    parser.add_argument("--audio_feature_size", type=int, default=80,
+                        help="Audio feature size.")
+    parser.add_argument("--conv_channels", type=int, default=1024,
+                        help="Convolutional channels.")
+    parser.add_argument("--conv_kernel_sizes", type=int, default=[5, 5], nargs='+',
+                        help="Convolutional kernel sizes.")
+
+
+def log_opts(parser):
+    parser.add_argument("--log_path", type=str, default=None,
+                        help="Log file path, default no output file.")
+    parser.add_argument("--log_level", choices=["ERROR", "INFO", "DEBUG", "NOTSET"], default="INFO",
+                        help="Console log level. Verbosity: ERROR < INFO < DEBUG < NOTSET")
+    parser.add_argument("--log_file_level", choices=["ERROR", "INFO", "DEBUG", "NOTSET"], default="INFO",
+                        help="Log file level. Verbosity: ERROR < INFO < DEBUG < NOTSET")
+
+
+def optimization_opts(parser):
+    parser.add_argument("--learning_rate", type=float, default=2e-5,
+                        help="Learning rate.")
+    parser.add_argument("--warmup", type=float, default=0.1,
+                        help="Warm up value.")
+    parser.add_argument("--fp16", action='store_true',
+                        help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit.")
+    parser.add_argument("--fp16_opt_level", choices=["O0", "O1", "O2", "O3" ], default='O1',
+                        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
+                             "See details at https://nvidia.github.io/apex/amp.html")
+    parser.add_argument("--optimizer", choices=["adamw", "adafactor"],
+                        default="adamw",
+                        help="Optimizer type.")
+    parser.add_argument("--scheduler", choices=["linear", "cosine", "cosine_with_restarts", "polynomial",
+                                                "constant", "constant_with_warmup"],
+                        default="linear", help="Scheduler type.")
+
+
+def training_opts(parser):
+    parser.add_argument("--batch_size", type=int, default=32,
+                        help="Batch size.")
+    parser.add_argument("--seq_length", type=int, default=128,
+                        help="Sequence length.")
+    parser.add_argument("--dropout", type=float, default=0.1,
+                        help="Dropout.")
+    parser.add_argument("--epochs_num", type=int, default=3,
+                        help="Number of epochs.")
+    parser.add_argument("--report_steps", type=int, default=100,
+                        help="Specific steps to print prompt.")
+    parser.add_argument("--seed", type=int, default=7,
+                        help="Random seed.")
+    log_opts(parser)
+
+
+def finetune_opts(parser):
+    # Path options.
+    parser.add_argument("--pretrained_model_path", default=None, type=str,
+                        help="Path of the pretrained model.")
+    parser.add_argument("--output_model_path", default="models/finetuned_model.bin", type=str,
+                        help="Path of the output model.")
+    parser.add_argument("--train_path", type=str, required=True,
+                        help="Path of the trainset.")
+    parser.add_argument("--dev_path", type=str, required=True,
+                        help="Path of the devset.")
+    parser.add_argument("--test_path", default=None, type=str,
+                        help="Path of the testset.")
+    parser.add_argument("--config_path", default="models/bert/base_config.json", type=str,
+                        help="Path of the config file.")
+
+    # Model options.
+    model_opts(parser)
+
+    # Optimization options.
+    optimization_opts(parser)
+
+    # Training options.
+    training_opts(parser)
+
+
+def infer_opts(parser):
+    # Path options.
+    parser.add_argument("--load_model_path", default=None, type=str,
+                        help="Path of the input model.")
+    parser.add_argument("--test_path", type=str, required=True,
+                        help="Path of the testset.")
+    parser.add_argument("--prediction_path", type=str, required=True,
+                        help="Path of the prediction file.")
+    parser.add_argument("--config_path", type=str, required=True,
+                        help="Path of the config file.")
+
+    # Model options.
+    model_opts(parser)
+
+    # Inference options.
+    parser.add_argument("--batch_size", type=int, default=64,
+                        help="Batch size.")
+    parser.add_argument("--seq_length", type=int, default=128,
+                        help="Sequence length.")
+
+
+def tokenizer_opts(parser):
+    parser.add_argument("--tokenizer", choices=["bert", "bpe", "char", "space", "xlmroberta"], default="bert",
+                        help="Specify the tokenizer." 
+                             "Original Google BERT uses bert tokenizer."
+                             "Char tokenizer segments sentences into characters."
+                             "Space tokenizer segments sentences into words according to space."
+                             "Original XLM-RoBERTa uses xlmroberta tokenizer."
+                             )
+    parser.add_argument("--vocab_path", default=None, type=str,
+                        help="Path of the vocabulary file.")
+    parser.add_argument("--merges_path", default=None, type=str,
+                        help="Path of the merges file.")
+    parser.add_argument("--spm_model_path", default=None, type=str,
+                        help="Path of the sentence piece model.")
+    parser.add_argument("--do_lower_case", choices=["true", "false"], default="true",
+                        help="Whether to lower case the input")
+
+
+def tgt_tokenizer_opts(parser):
+    parser.add_argument("--tgt_tokenizer", choices=["bert", "bpe", "char", "space", "xlmroberta"], default="bert",
+                        help="Specify the tokenizer for target side.")
+    parser.add_argument("--tgt_vocab_path", default=None, type=str,
+                        help="Path of the target vocabulary file.")
+    parser.add_argument("--tgt_merges_path", default=None, type=str,
+                        help="Path of the target merges file.")
+    parser.add_argument("--tgt_spm_model_path", default=None, type=str,
+                        help="Path of the target sentence piece model.")
+    parser.add_argument("--tgt_do_lower_case", choices=["true", "false"], default="true",
+                        help="Whether to lower case the target input")
+
+
+def deepspeed_opts(parser):
+    parser.add_argument("--deepspeed", action="store_true",
+                        help=".")
+    parser.add_argument("--deepspeed_config", default="models/deepspeed_config.json", type=str,
+                        help=".")
+    parser.add_argument("--deepspeed_checkpoint_activations", action='store_true',
+                        help="Checkpoint activation to allow for training with larger models, sequences, and batch sizes.")
+    parser.add_argument("--deepspeed_checkpoint_layers_num", type=int, default=1,
+                        help="chunk size (number of layers) for checkpointing.")
+    parser.add_argument("--local_rank", type=int, required=False)
+
+
+def adv_opts(parser):
+    parser.add_argument("--use_adv", action="store_true",
+                        help=".")
+    parser.add_argument("--adv_type", choices=["fgm", "pgd"], default="fgm",
+                        help="Specify the adversal training type.")
+    parser.add_argument("--fgm_epsilon", type=float, default=1e-6,
+                        help="Epsilon for FGM.")
+    parser.add_argument("--pgd_k", type=int, default=3,
+                        help="Steps for PGD.")
+    parser.add_argument("--pgd_epsilon", type=float, default=1.,
+                        help="Epsilon for PGD.")
+    parser.add_argument("--pgd_alpha", type=float, default=0.3,
+                        help="Alpha for PGD.")

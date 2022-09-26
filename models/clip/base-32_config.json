@@ -1,0 +1,45 @@
+{
+  "stream_0": {
+    "emb_size": 512,
+    "feedforward_size": 2048,
+    "hidden_size": 512,
+    "hidden_act": "gelu",
+    "heads_num": 8,
+    "layers_num": 12,
+    "max_seq_length": 512,
+    "embedding": ["word", "pos"],
+    "encoder": "transformer",
+    "mask": "fully_visible",
+    "remove_embedding_layernorm": false,
+    "layernorm_positioning": "post",
+    "pooling": "first"
+  },
+
+  "stream_1": {
+    "emb_size": 768,
+    "feedforward_size": 3072,
+    "hidden_size": 768,
+    "hidden_act": "gelu_fast",
+    "heads_num": 12,
+    "layers_num": 12,
+    "max_seq_length": 50,
+    "embedding": ["patch", "pos"],
+    "encoder": "transformer",
+    "mask": "fully_visible",
+    "remove_embedding_layernorm": true,
+    "layernorm_positioning": "pre",
+    "pooling": "first"
+  },
+
+  "data_processor": "clip",
+  "embedding": ["dual"],
+  "encoder": "dual",
+  "target": ["clr"],
+  "image_height": 224,
+  "image_width": 224,
+  "patch_size": 32,
+  "feature_size": 512,
+  "projection": true,
+  "tie_weights": false,
+  "dropout": 0.0
+}
