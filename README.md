@@ -1,10 +1,10 @@
-[**English**](https://git.woa.com/TencentNLP/TencentPretrain) | [**中文**](https://git.woa.com/TencentNLP/TencentPretrain/blob/master/README_ZH.md)
+[**English**](https://github.com/Tencent/TencentPretrain) | [**中文**](https://github.com/Tencent/TencentPretrain/blob/main/README_ZH.md)
 
 ## TencentPretrain: Tencent Pre-training Framework 
 
 Pre-training has become an essential part of AI technology. TencentPretrain is a toolkit for pre-training on different modalities (e.g. text and vision) and fine-tuning on downstream task. TencentPretrain maintains model modularity and supports research extensibility. It facilitates the use of existing pre-training models, and provides interfaces for users to further extend upon. With TencentPretrain, we build a model zoo which contains pre-trained models of different properties. TencentPretrain inherits the open source toolkit UER (https://github.com/dbiir/UER-py/) and extends it to a multimodal pre-training framework.
 
-#### **Full Documentation：https://iwiki.woa.com/space/TencentPretrain**
+#### **Full Documentation：https://github.com/Tencent/TencentPretrain/wiki**
 
 <br>
 
@@ -130,18 +130,18 @@ We need to explicitly specify the number of labels by *--labels_num*. Douban boo
 
 <br>
 
-The above content provides basic ways of using TencentPretrain to pre-process, pre-train, fine-tune, and do inference. More use cases can be found in complete :arrow_right: [__quickstart__](https://iwiki.woa.com/pages/viewpage.action?pageId=1911042092) :arrow_left: . The complete quickstart contains abundant use cases, covering most of the pre-training related application scenarios. It is recommended that users read the complete quickstart in order to use the project reasonably.
+The above content provides basic ways of using TencentPretrain to pre-process, pre-train, fine-tune, and do inference. More use cases can be found in complete :arrow_right: [__quickstart__](https://github.com/Tencent/TencentPretrain/wiki/Quickstart) :arrow_left: . The complete quickstart contains abundant use cases, covering most of the pre-training related application scenarios. It is recommended that users read the complete quickstart in order to use the project reasonably.
 
 
 <br/>
 
 ## Datasets
-We collected a range of :arrow_right: [__downstream datasets__](https://iwiki.woa.com/pages/viewpage.action?pageId=1911042158) :arrow_left: and converted them into the format that TencentPretrain can load directly.
+We collected a range of :arrow_right: [__downstream datasets__](https://github.com/Tencent/TencentPretrain/wiki/Datasets) :arrow_left: and converted them into the format that TencentPretrain can load directly.
 
 <br/>
 
 ## Modelzoo
-With the help of TencentPretrain, we pre-trained models of different properties (e.g. models based on different modalities, encoders, and targets). Detailed introduction of pre-trained models and their download links can be found in :arrow_right: [__modelzoo__](https://iwiki.woa.com/pages/viewpage.action?pageId=1911042159) :arrow_left: . All pre-trained models can be loaded by TencentPretrain directly. More pre-trained models will be released in the future.
+With the help of TencentPretrain, we pre-trained models of different properties (e.g. models based on different modalities, encoders, and targets). Detailed introduction of pre-trained models and their download links can be found in :arrow_right: [__modelzoo__](https://github.com/Tencent/TencentPretrain/wiki/Modelzoo) :arrow_left: . All pre-trained models can be loaded by TencentPretrain directly. More pre-trained models will be released in the future.
 
 <br/>
 
@@ -180,9 +180,9 @@ TencentPretrain/
 
 The code is well-organized. Users can use and extend upon it with little efforts.
 
-Comprehensive examples of using TencentPretrain can be found in :arrow_right: [__instructions__](https://iwiki.woa.com/pages/viewpage.action?pageId=1911042160) :arrow_left: , which help users quickly implement pre-training models such as BERT, GPT-2, ELMo, T5, CLIP and fine-tune pre-trained models on a range of downstream tasks.
+Comprehensive examples of using TencentPretrain can be found in :arrow_right: [__instructions__](https://github.com/Tencent/TencentPretrain/wiki/Instructions) :arrow_left: , which help users quickly implement pre-training models such as BERT, GPT-2, ELMo, T5, CLIP and fine-tune pre-trained models on a range of downstream tasks.
 
 <br/>
 
 ## Competition solutions
-TencentPretrain has been used in winning solutions of many competitions. In this section, we provide some examples of using TencentPretrain to achieve SOTA results on competitions, such as CLUE. See :arrow_right: [__competition solutions__](https://iwiki.woa.com/pages/viewpage.action?pageId=1911042186) :arrow_left: for more detailed information.
+TencentPretrain has been used in winning solutions of many competitions. In this section, we provide some examples of using TencentPretrain to achieve SOTA results on competitions, such as CLUE. See :arrow_right: [__competition solutions__](https://github.com/Tencent/TencentPretrain/wiki/Competition-solutions) :arrow_left: for more detailed information.

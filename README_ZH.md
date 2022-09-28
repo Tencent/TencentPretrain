@@ -1,10 +1,10 @@
-[**English**](https://git.woa.com/TencentNLP/TencentPretrain) | [**中文**](https://git.woa.com/TencentNLP/TencentPretrain/blob/master/README_ZH.md)
+[**English**](https://github.com/Tencent/TencentPretrain) | [**中文**](https://github.com/Tencent/TencentPretrain/blob/main/README_ZH.md)
 
 ## TencentPretrain：腾讯预训练模型框架
 
-预训练已经成为人工智能技术的重要组成部分，为大量人工智能相关任务带来了显著提升。TencentPretrain是一个用于对文本、图像、语音等模态数据进行预训练并对下游任务进行微调的工具包。TencentPretrain遵循模块化的设计原则。通过模块的组合，用户能迅速精准的复现已有的预训练模型，并利用已有的接口进一步开发更多的预训练模型。通过TencentPretrain，我们建立了一个模型仓库，其中包含不同性质的预训练模型（例如基于不同模态、编码器、目标任务）。用户可以根据具体任务的要求，从中选择合适的预训练模型使用。TencentPretrain继承了开源项目UER(https://github.com/dbiir/UER-py/)的大部分工作，并在其基础上进一步开发，形成支持多模态的预训练模型框架。
+预训练已经成为人工智能技术的重要组成部分，为大量人工智能相关任务带来了显著提升。TencentPretrain是一个用于对文本、图像、语音等模态数据进行预训练并对下游任务进行微调的工具包。TencentPretrain遵循模块化的设计原则。通过模块的组合，用户能迅速精准的复现已有的预训练模型，并利用已有的接口进一步开发更多的预训练模型。通过TencentPretrain，我们建立了一个模型仓库，其中包含不同性质的预训练模型（例如基于不同模态、编码器、目标任务）。用户可以根据具体任务的要求，从中选择合适的预训练模型使用。TencentPretrain继承了开源项目UER (https://github.com/dbiir/UER-py/) 的大部分工作，并在其基础上进一步开发，形成支持多模态的预训练模型框架。
 
-#### **项目使用文档：https://iwiki.woa.com/space/TencentPretrain**
+#### **项目使用文档：https://github.com/Tencent/TencentPretrain/wiki/主页**
 
 <br>
 
@@ -125,17 +125,17 @@ python3 inference/run_classifier_infer.py --load_model_path models/finetuned_mod
 
 <br>
 
-以上我们给出了用TencentPretrain进行预处理、预训练、微调、推理的基本使用方式。更多的例子参见完整的 :arrow_right: [__快速上手__](https://iwiki.woa.com/pages/viewpage.action?pageId=523423585) :arrow_left: 。完整的快速上手包含了全面的例子，覆盖了大多数预训练相关的使用场景。推荐用户完整阅读快速上手章节，以便能合理的使用本项目。
+以上我们给出了用TencentPretrain进行预处理、预训练、微调、推理的基本使用方式。更多的例子参见完整的 :arrow_right: [__快速上手__](https://github.com/Tencent/TencentPretrain/wiki/快速上手) :arrow_left: 。完整的快速上手包含了全面的例子，覆盖了大多数预训练相关的使用场景。推荐用户完整阅读快速上手章节，以便能合理的使用本项目。
 
 <br>
 
 ## 数据集
-我们收集了一系列 :arrow_right: [__下游任务数据集__](https://iwiki.woa.com/pages/viewpage.action?pageId=663927509) :arrow_left: 并将其转换为TencentPretrain可以直接加载的格式。
+我们收集了一系列 :arrow_right: [__下游任务数据集__](https://github.com/Tencent/TencentPretrain/wiki/下游任务数据集) :arrow_left: 并将其转换为TencentPretrain可以直接加载的格式。
 
 <br>
 
 ## 预训练模型仓库
-借助TencentPretrain，我们训练不同性质的预训练模型（例如基于不同模态、编码器、目标任务）。用户可以在 :arrow_right: [__预训练模型仓库__](https://iwiki.woa.com/pages/viewpage.action?pageId=523978326) :arrow_left: 中找到各种性质的预训练模型以及它们对应的描述和下载链接。所有预训练模型都可以由TencentPretrain直接加载。将来我们会发布更多的预训练模型。
+借助TencentPretrain，我们训练不同性质的预训练模型（例如基于不同模态、编码器、目标任务）。用户可以在 :arrow_right: [__预训练模型仓库__](https://github.com/Tencent/TencentPretrain/wiki/预训练模型仓库) :arrow_left: 中找到各种性质的预训练模型以及它们对应的描述和下载链接。所有预训练模型都可以由TencentPretrain直接加载。将来我们会发布更多的预训练模型。
 
 <br>
 
@@ -170,9 +170,9 @@ TencentPretrain/
 
 ```
 
-在 :arrow_right: [__使用说明__](https://iwiki.woa.com/pages/viewpage.action?pageId=663942079) :arrow_left: 中给出了全面的TencentPretrain使用示例。这些示例可以帮助用户快速实现BERT、GPT-2、ELMo、T5、CLIP等预训练模型以及使用这些预训练模型在一系列下游任务上进行微调。
+在 :arrow_right: [__使用说明__](https://github.com/Tencent/TencentPretrain/wiki/使用说明) :arrow_left: 中给出了全面的TencentPretrain使用示例。这些示例可以帮助用户快速实现BERT、GPT-2、ELMo、T5、CLIP等预训练模型以及使用这些预训练模型在一系列下游任务上进行微调。
 
 <br>
 
 ## 竞赛解决方案
-TencentPretrain已被用于许多竞赛的获奖解决方案中。在本章节中，我们提供了一些使用TencentPretrain在竞赛中获得SOTA成绩的示例，例如CLUE。更多详细信息参见 :arrow_right: [__竞赛解决方案__](https://iwiki.woa.com/pages/viewpage.action?pageId=663936867) :arrow_left: 。
+TencentPretrain已被用于许多竞赛的获奖解决方案中。在本章节中，我们提供了一些使用TencentPretrain在竞赛中获得SOTA成绩的示例，例如CLUE。更多详细信息参见 :arrow_right: [__竞赛解决方案__](https://github.com/Tencent/TencentPretrain/wiki/竞赛解决方案) :arrow_left: 。
