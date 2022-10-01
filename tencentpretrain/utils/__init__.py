@@ -6,17 +6,20 @@ from tencentpretrain.utils.adversarial import *
 
 
 str2tokenizer = {"char": CharTokenizer, "space": SpaceTokenizer, "bert": BertTokenizer,
-                 "bpe": BPETokenizer, "xlmroberta": XLMRobertaTokenizer}
+                 "bpe": BPETokenizer, "xlmroberta": XLMRobertaTokenizer, "image": ImageTokenizer,
+                 "text_image": TextImageTokenizer}
 str2dataset = {"bert": BertDataset, "lm": LmDataset, "mlm": MlmDataset,
                "bilm": BilmDataset, "albert": AlbertDataset, "mt": MtDataset,
                "t5": T5Dataset, "gsg": GsgDataset, "bart": BartDataset,
                "cls": ClsDataset, "prefixlm": PrefixlmDataset, "cls_mlm": ClsMlmDataset,
-               "vit": VitDataset, "vilt": ViltDataset, "clip": ClipDataset, "s2t": S2tDataset}
+               "vit": VitDataset, "vilt": ViltDataset, "clip": ClipDataset, "s2t": S2tDataset,
+               "beit":BeitDataset, "dalle": DalleDataset}
 str2dataloader = {"bert": BertDataloader, "lm": LmDataloader, "mlm": MlmDataloader,
                   "bilm": BilmDataloader, "albert": AlbertDataloader, "mt": MtDataloader,
                   "t5": T5Dataloader, "gsg": GsgDataloader, "bart": BartDataloader,
                   "cls": ClsDataloader, "prefixlm": PrefixlmDataloader, "cls_mlm": ClsMlmDataloader,
-                  "vit": VitDataloader, "vilt": ViltDataloader, "clip": ClipDataloader, "s2t": S2tDataloader}
+                  "vit": VitDataloader, "vilt": ViltDataloader, "clip": ClipDataloader, "s2t": S2tDataloader,
+                  "beit":BeitDataloader, "dalle": DalleDataloader}
 
 str2act = {"gelu": gelu, "gelu_fast": gelu_fast, "relu": relu, "silu": silu, "linear": linear}
 
@@ -29,13 +32,16 @@ str2scheduler = {"linear": get_linear_schedule_with_warmup, "cosine": get_cosine
 
 str2adv = {"fgm": FGM, "pgd": PGD}
 
-__all__ = ["CharTokenizer", "SpaceTokenizer", "BertTokenizer", "BPETokenizer", "XLMRobertaTokenizer", "str2tokenizer",
+__all__ = ["CharTokenizer", "SpaceTokenizer", "BertTokenizer", "BPETokenizer", "XLMRobertaTokenizer",
+           "ImageTokenizer", "TextImageTokenizer", "str2tokenizer",
            "BertDataset", "LmDataset", "MlmDataset", "BilmDataset",
            "AlbertDataset", "MtDataset", "T5Dataset", "GsgDataset",
-           "BartDataset", "ClsDataset", "PrefixlmDataset", "ClsMlmDataset", "str2dataset",
+           "BartDataset", "ClsDataset", "PrefixlmDataset", "ClsMlmDataset",
+           "VitDataset", "ViltDataset", "ClipDataset", "BeitDataset", "str2dataset",
            "BertDataloader", "LmDataloader", "MlmDataloader", "BilmDataloader",
            "AlbertDataloader", "MtDataloader", "T5Dataloader", "GsgDataloader",
-           "BartDataloader", "ClsDataloader", "PrefixlmDataloader", "ClsMlmDataloader", "str2dataloader",
+           "BartDataloader", "ClsDataloader", "PrefixlmDataloader", "ClsMlmDataloader",
+           "VitDataloader", "ViltDataloader", "ClipDataloader", "BeitDataloader", "str2dataloader",
            "gelu", "gelu_fast", "relu", "silu", "linear", "str2act",
            "AdamW", "Adafactor", "str2optimizer",
            "get_linear_schedule_with_warmup", "get_cosine_schedule_with_warmup",

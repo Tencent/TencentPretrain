@@ -97,7 +97,8 @@ class Trainer(object):
             self.seq_length = batch[0].size(1)
             if gpu_id is not None:
                 for i in range(len(batch)):
-                    batch[i] = batch[i].cuda(gpu_id)
+                    if torch.is_tensor(batch[i]):
+                        batch[i] = batch[i].cuda(gpu_id)
 
             loss = self.forward_propagation(batch, model)
 
@@ -486,11 +487,28 @@ class S2tTrainer(MtTrainer):
     pass
 
 
+class BeitTrainer(MlmTrainer):
+    def forward_propagation(self, batch,  model):
+        src, tgt, seg, mask = batch
+        loss_info = model((src, mask), tgt, seg)
+        loss, correct, denominator = loss_info
+        self.total_loss += loss.item()
+        self.total_correct += correct.item()
+        self.total_denominator += denominator.item()
+        loss = loss / self.accumulation_steps
+        return loss
+
+
+class DalleTrainer(LmTrainer):
+    pass
+
+
 str2trainer = {"bert": BertTrainer, "mlm": MlmTrainer, "lm": LmTrainer,
                "albert": AlbertTrainer, "bilm": BilmTrainer, "cls": ClsTrainer,
                "mt": MtTrainer, "t5": T5Trainer, "gsg": GsgTrainer,
                "bart": BartTrainer, "prefixlm": PrefixlmTrainer, "cls_mlm": ClsMlmTrainer,
-               "vit": VitTrainer, "vilt": ViltTrainer, "clip": ClipTrainer, "s2t": S2tTrainer}
+               "vit": VitTrainer, "vilt": ViltTrainer, "clip": ClipTrainer, "s2t": S2tTrainer,
+               "beit": BeitTrainer, "dalle": DalleTrainer}
 
 
 def worker(proc_id, gpu_ranks, args, model):

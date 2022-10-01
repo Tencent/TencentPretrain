@@ -879,8 +879,9 @@ class FileWithTextDataset(Dataset):
 
                 text = line[0]
                 path = line[1]
-                src = [self.vocab.get(CLS_TOKEN)] + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text)) + [self.vocab.get(SEP_TOKEN)]
-                src = src[:self.seq_length]
+                src = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text))
+                src = src[:self.seq_length - 2]
+                src = [self.vocab.get(CLS_TOKEN)] + src + [self.vocab.get(SEP_TOKEN)]
                 seg_pos = [len(src)]
 
                 pad_num = self.seq_length - len(src)
@@ -921,6 +922,28 @@ class FileWithLabelDataset(Dataset):
         dataset_writer.close()
 
 
+class FileDataset(Dataset):
+    def worker(self, proc_id, start, end):
+        print("Worker %d is building dataset ... " % proc_id)
+        set_seed(self.seed)
+        dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
+        pos = 0
+        with open(self.corpus_path, mode="r", encoding="utf-8") as f:
+            while pos < start:
+                f.readline()
+                pos += 1
+            while True:
+                line = f.readline()
+                pos += 1
+                path = line.strip()
+
+                pickle.dump((path), dataset_writer)
+
+                if pos >= end:
+                    break
+
+        dataset_writer.close()
+
 class VitDataset(FileWithLabelDataset):
     pass
 
@@ -934,4 +957,12 @@ class ClipDataset(FileWithTextDataset):
 
 
 class S2tDataset(FileWithTextDataset):
+    pass
+
+
+class BeitDataset(FileDataset):
+    pass
+
+
+class DalleDataset(FileWithTextDataset):
     pass

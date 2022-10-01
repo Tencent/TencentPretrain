@@ -33,10 +33,10 @@ class Vocab(object):
 
     def get(self, w):
         return self.w2i[w]
-        
+
     def __len__(self):
         return len(self.i2w)
-        
+
     def worker(self, corpus_path, tokenizer, start, end):
         """ 
         Worker that creates vocabulary from corpus[start:end].

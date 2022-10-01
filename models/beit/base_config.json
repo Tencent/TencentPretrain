@@ -1,0 +1,25 @@
+{
+  "emb_size": 768,
+  "feedforward_size": 3072,
+  "hidden_size": 768,
+  "hidden_act": "gelu",
+  "heads_num": 12,
+  "layers_num": 12,
+  "dropout": 0.1,
+  "data_processor": "beit",
+  "embedding": ["masked_patch", "pos"],
+  "encoder": "transformer",
+  "mask": "fully_visible",
+  "target": ["mlm"],
+  "image_height": 256,
+  "image_width": 256,
+  "patch_size": 16,
+  "image_preprocess": ["crop"],
+  "tokenizer": "vqgan",
+  "image_tokenizer": {
+    "is_gumbel": false,
+    "is_transformer": true,
+    "image_vocab_size": 1024,
+    "frame_size": 16
+  }
+}

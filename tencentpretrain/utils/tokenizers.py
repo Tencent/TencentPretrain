@@ -578,3 +578,20 @@ def _is_punctuation(char):
     if cat.startswith("P"):
         return True
     return False
+
+
+class ImageTokenizer(Tokenizer):
+    """ Virtual tokenizer for model building  """
+
+    def __init__(self, args, is_src=True):
+        self.vocab = range(args.image_tokenizer["image_vocab_size"])
+
+
+class TextImageTokenizer(BertTokenizer):
+    """ Text and image tokenizer (BERT and VQGAN) """
+
+    def __init__(self, args, is_src=True):
+        super().__init__(args, is_src)
+        self.vocab_bias = len(self.vocab)
+        for i in range(args.image_tokenizer["image_vocab_size"]):
+            self.vocab[i + self.vocab_bias] = str(i)

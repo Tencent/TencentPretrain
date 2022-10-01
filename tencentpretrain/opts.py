@@ -167,7 +167,7 @@ def infer_opts(parser):
 
 
 def tokenizer_opts(parser):
-    parser.add_argument("--tokenizer", choices=["bert", "bpe", "char", "space", "xlmroberta"], default="bert",
+    parser.add_argument("--tokenizer", choices=["bert", "bpe", "char", "space", "xlmroberta", "image", "text_image"], default="bert",
                         help="Specify the tokenizer." 
                              "Original Google BERT uses bert tokenizer."
                              "Char tokenizer segments sentences into characters."
@@ -182,6 +182,10 @@ def tokenizer_opts(parser):
                         help="Path of the sentence piece model.")
     parser.add_argument("--do_lower_case", choices=["true", "false"], default="true",
                         help="Whether to lower case the input")
+    parser.add_argument("--vqgan_model_path", default=None, type=str,
+                        help="Path of the taming transformers (vqgan).")
+    parser.add_argument("--vqgan_config_path", default=None, type=str,
+                        help="Path of the vqgan config file.")
 
 
 def tgt_tokenizer_opts(parser):

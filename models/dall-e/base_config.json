@@ -1,0 +1,24 @@
+{
+  "emb_size": 768,
+  "feedforward_size": 3072,
+  "hidden_size": 768,
+  "hidden_act": "gelu",
+  "heads_num": 12,
+  "layers_num": 12,
+  "dropout": 0.1,
+  "data_processor": "dalle",
+  "embedding": ["word", "pos", "seg"],
+  "encoder": "transformer",
+  "mask": "prefix",
+  "target": ["lm"],
+  "image_height": 256,
+  "image_width": 256,
+  "patch_size": 16,
+  "tokenizer": "multimodal",
+  "image_tokenizer": {
+    "is_gumbel": false,
+    "is_transformer": true,
+    "image_vocab_size": 1024,
+    "frame_size": 16
+  }
+}

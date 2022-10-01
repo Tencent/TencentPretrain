@@ -814,3 +814,110 @@ class S2tDataloader(AudioDataloader):
                    torch.LongTensor(seg_audio), \
                    torch.LongTensor(tgt_in), \
                    torch.LongTensor(tgt_seg)
+
+
+class BeitDataloader(VisionDataloader):
+
+    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, shuffle=False):
+        super(BeitDataloader, self).__init__(args, dataset_path, batch_size, proc_id, proc_num, shuffle)
+        from tencentpretrain.utils.image_tokenizer import build_vqgan_model
+        self.vqgan = build_vqgan_model(args).cuda(proc_id)
+
+
+    def mask(self, image_tokens, mask_rate = 0.15):
+        mask_num = int(len(image_tokens) * mask_rate)
+        mask_index = random.sample(range(1, len(image_tokens)), mask_num)
+        tgt = [0] * len(image_tokens)
+        for idx in mask_index:
+            tgt[idx] = image_tokens[idx]
+        return tgt, mask_index
+
+
+    def __iter__(self):
+        """
+        instances: (tgt, image_path)
+            tgt: The category the image belongs to
+            image_path: Path of the image sample
+
+        Returns:
+            src_image: [batch_size x channel_size x width x hight]
+            seg: [batch_size x (patch_num + 1)]
+            tgt: [batch_size]
+        """
+        from PIL import Image
+        from tencentpretrain.utils.image_tokenizer import image_tokenize
+
+        while True:
+            while self._empty():
+                self._fill_buf()
+            if self.start + self.batch_size >= self.end:
+                instances = self.buffer[self.start:]
+            else:
+                instances = self.buffer[self.start: self.start + self.batch_size]
+
+            self.start += self.batch_size
+
+            src = []
+            tgt = []
+            seg = []
+            mask = []
+            for ins in instances:
+
+                image = Image.open(ins)
+                image = self.transform(image)
+                src.append(image)
+                image_tokens = [0] + image_tokenize(self.vqgan, image.cuda(self.proc_id))
+                tgt_single, mask_index = self.mask(image_tokens)
+                tgt.append(tgt_single)
+                mask.append(mask_index)
+                seg.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
+
+            yield torch.stack(src, 0), \
+                  torch.LongTensor(tgt), \
+                  torch.LongTensor(seg), \
+                  mask
+
+
+class DalleDataloader(VisionDataloader):
+
+    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, shuffle=False):
+        super(DalleDataloader, self).__init__(args, dataset_path, batch_size, proc_id, proc_num, shuffle)
+        from tencentpretrain.utils.image_tokenizer import build_vqgan_model
+        self.vqgan = build_vqgan_model(args).cuda(self.proc_id)
+        self.vocab_bias = args.tokenizer.vocab_bias
+
+
+    def __iter__(self):
+        from PIL import Image
+        from tencentpretrain.utils.image_tokenizer import image_tokenize
+
+        while True:
+            while self._empty():
+                self._fill_buf()
+            if self.start + self.batch_size >= self.end:
+                instances = self.buffer[self.start:]
+            else:
+                instances = self.buffer[self.start: self.start + self.batch_size]
+
+            self.start += self.batch_size
+
+            src = []
+            tgt = []
+            seg = []
+            for ins in instances:
+                src_single, pad_num = ins[0]
+
+                image = Image.open(ins[2])
+                image = self.transform(image)
+                image_tokens = [i + self.vocab_bias for i in image_tokenize(self.vqgan, image.cuda(self.proc_id))]
+                src_single.extend(image_tokens)
+                for _ in range(pad_num):
+                    src_single.append(self.vocab.get(PAD_TOKEN))
+                seg_single = [1] * ins[1][0] + [2] * len(image_tokens) + [0] * pad_num
+                src.append(src_single)
+                tgt.append(src_single[1:] + [self.vocab.get(SEP_TOKEN)])
+                seg.append(seg_single)
+
+            yield torch.LongTensor(src), \
+                  torch.LongTensor(tgt), \
+                  torch.LongTensor(seg)
