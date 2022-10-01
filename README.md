@@ -135,12 +135,12 @@ The above content provides basic ways of using TencentPretrain to pre-process, p
 <br/>
 
 ## Pre-training data
-This section provides links to a range of :arrow_right: [__pre-training data__](https://github.com/Tencent/TencentPretrain/wiki/Pre-training-data) :arrow_left: (in other open source projects).
+This section provides links to a range of :arrow_right: [__pre-training data__](https://github.com/Tencent/TencentPretrain/wiki/Pretraining-data) :arrow_left: (in other open source projects).
 
 <br/>
 
 ## Downstream datasets
-This section provides links to a range of :arrow_right: [__downstream datasets__](https://github.com/Tencent/TencentPretrain/wiki/Downstream-atasets) :arrow_left: (in other open source projects). TencentPretrain can load these datasets directly.
+This section provides links to a range of :arrow_right: [__downstream datasets__](https://github.com/Tencent/TencentPretrain/wiki/Downstream-datasets) :arrow_left: (in other open source projects). TencentPretrain can load these datasets directly.
 
 <br/>
 
