@@ -2,7 +2,7 @@
 
 ## TencentPretrain：腾讯预训练模型框架
 
-预训练已经成为人工智能技术的重要组成部分，为大量人工智能相关任务带来了显著提升。TencentPretrain是一个用于对文本、图像、语音等模态数据进行预训练并对下游任务进行微调的工具包。TencentPretrain遵循模块化的设计原则。通过模块的组合，用户能迅速精准的复现已有的预训练模型，并利用已有的接口进一步开发更多的预训练模型。通过TencentPretrain，我们建立了一个模型仓库，其中包含不同性质的预训练模型（例如基于不同模态、编码器、目标任务）。用户可以根据具体任务的要求，从中选择合适的预训练模型使用。TencentPretrain继承了开源项目UER (https://github.com/dbiir/UER-py/) 的大部分工作，并在其基础上进一步开发，形成支持多模态的预训练模型框架。
+预训练已经成为人工智能技术的重要组成部分，为大量人工智能相关任务带来了显著提升。TencentPretrain是一个用于对文本、图像、语音等模态数据进行预训练和微调的工具包。TencentPretrain遵循模块化的设计原则。通过模块的组合，用户能迅速精准的复现已有的预训练模型，并利用已有的接口进一步开发更多的预训练模型。通过TencentPretrain，我们建立了一个模型仓库，其中包含不同性质的预训练模型（例如基于不同模态、编码器、目标任务）。用户可以根据具体任务的要求，从中选择合适的预训练模型使用。TencentPretrain继承了开源项目UER (https://github.com/dbiir/UER-py/) 的部分工作，并在其基础上进一步开发，形成支持多模态的预训练模型框架。
 
 #### **项目使用文档：https://github.com/Tencent/TencentPretrain/wiki/主页**
 
@@ -13,10 +13,12 @@
   * [项目特色](#项目特色)
   * [依赖环境](#依赖环境)
   * [快速上手](#快速上手)
-  * [数据集](#数据集)
+  * [预训练数据](#预训练数据)
+  * [下游任务数据集](#下游任务数据集)
   * [预训练模型仓库](#预训练模型仓库)
   * [使用说明](#使用说明)
   * [竞赛解决方案](#竞赛解决方案)
+  * [引用](#引用)
 
 <br>
 
@@ -27,7 +29,7 @@ TencentPretrain有如下几方面优势:
 - __多模态__ TencentPretrain支持文本、图像、语音模态的预训练模型，并支持模态之间的翻译、融合等操作
 - __模型训练__ TencentPretrain支持CPU、单机单GPU、单机多GPU、多机多GPU训练模式，并支持使用DeepSpeed优化库进行超大模型训练
 - __模型仓库__ 我们维护并持续发布预训练模型。用户可以根据具体任务的要求，从中选择合适的预训练模型使用
-- __SOTA结果__ TencentPretrain支持全面的下游任务，包括文本（图像）分类、文本对分类、序列标注、阅读理解、语音识别等，并提供了多个竞赛获胜解决方案
+- __SOTA结果__ TencentPretrain支持全面的下游任务，包括文本/图像分类、序列标注、阅读理解、语音识别等，并提供了多个竞赛获胜解决方案
 - __预训练相关功能__ TencentPretrain提供了丰富的预训练相关的功能和优化，包括特征抽取、近义词检索、预训练模型转换、模型集成、文本生成等
 
 <br>
@@ -52,7 +54,7 @@ TencentPretrain有如下几方面优势:
 <br>
 
 ## 快速上手
-这里我们通过常用的例子来简要说明如何使用TencentPretrain，更多的细节请参考使用说明章节。我们首先使用文本预训练模型BERT和豆瓣书评分类数据集。我们在书评语料上对模型进行预训练，然后在书评分类数据集上对其进行微调。这个过程有三个输入文件：书评语料，书评分类数据集和中文词典。这些文件均为UTF-8编码，并被包括在这个项目中。
+这里我们通过常用的例子来简要说明如何使用TencentPretrain，更多的细节请参考使用说明章节。我们首先使用文本预训练模型BERT和书评情感分类数据集。这个数据集是由[这篇论文](http://www.cips-cl.org/static/anthology/CCL-2018/CCL-18-086.pdf)收集，并开源在[这里](https://github.com/Embedding/Embedding.github.io/blob/master/extrinsic_eval_data.zip)。我们在书评语料上对模型进行预训练，然后在书评情感分类数据集上对其进行微调。这个过程有三个输入文件：书评语料，书评情感分类数据集和中文词典。这些文件均为UTF-8编码，并被包括在这个项目中。
 
 BERT模型要求的预训练语料格式是一行一个句子，不同文档使用空行分隔，如下所示：
 
@@ -66,7 +68,7 @@ doc2-sent1
 doc3-sent1
 doc3-sent2
 ```
-书评语料是由书评分类数据集去掉标签得到的。我们将一条评论从中间分开，从而形成一个两句话的文档，具体可见*corpora*文件夹中的*book_review_bert.txt*。
+书评语料是由书评情感分类数据集去掉标签得到的。我们将一条评论从中间分开，从而形成一个两句话的文档，具体可见*corpora*文件夹中的*book_review_bert.txt*。
 
 分类数据集的格式如下：
 ```
@@ -129,8 +131,13 @@ python3 inference/run_classifier_infer.py --load_model_path models/finetuned_mod
 
 <br>
 
-## 数据集
-我们收集了一系列 :arrow_right: [__下游任务数据集__](https://github.com/Tencent/TencentPretrain/wiki/下游任务数据集) :arrow_left: 并将其转换为TencentPretrain可以直接加载的格式。
+## 预训练数据
+我们提供了链接，指向一系列其他项目开源的 :arrow_right: [__预训练数据__](https://github.com/Tencent/TencentPretrain/wiki/预训练数据) :arrow_left: 。
+
+<br>
+
+## 下游任务数据集
+我们提供了链接，指向一系列其他项目开源的 :arrow_right: [__下游任务数据集__](https://github.com/Tencent/TencentPretrain/wiki/下游任务数据集) :arrow_left: 。TencentPretrain可以直接加载这些数据集。
 
 <br>
 
@@ -154,6 +161,7 @@ TencentPretrain/
     |    |--model_builder.py
     |    |--model_loader.py
     |    |--model_saver.py
+    |    |--opts.py
     |    |--trainer.py
     |
     |--corpora/ # 预训练数据存放文件夹
@@ -166,7 +174,9 @@ TencentPretrain/
     |--preprocess.py
     |--pretrain.py
     |--README.md
+    |--README_ZH.md
     |--requirements.txt
+    |--LICENSE
 
 ```
 

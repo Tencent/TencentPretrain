@@ -2,7 +2,7 @@
 
 ## TencentPretrain: Tencent Pre-training Framework 
 
-Pre-training has become an essential part of AI technology. TencentPretrain is a toolkit for pre-training on different modalities (e.g. text and vision) and fine-tuning on downstream task. TencentPretrain maintains model modularity and supports research extensibility. It facilitates the use of existing pre-training models, and provides interfaces for users to further extend upon. With TencentPretrain, we build a model zoo which contains pre-trained models of different properties. TencentPretrain inherits the open source toolkit UER (https://github.com/dbiir/UER-py/) and extends it to a multimodal pre-training framework.
+Pre-training has become an essential part of AI technology. TencentPretrain is a toolkit for pre-training and fine-tuning on data of different modalities (e.g. text and vision). TencentPretrain is characterized by modular design. It facilitates the use of existing pre-training models, and provides interfaces for users to further extend upon. With TencentPretrain, we build a model zoo which contains pre-trained models of different properties. TencentPretrain inherits the open source toolkit UER (https://github.com/dbiir/UER-py/) and extends it to a multimodal pre-training framework.
 
 #### **Full Documentation：https://github.com/Tencent/TencentPretrain/wiki**
 
@@ -13,6 +13,7 @@ Table of Contents
   * [Features](#features)
   * [Requirements](#requirements)
   * [Quickstart](#quickstart)
+  * [Corpora](#corpora)
   * [Datasets](#datasets)
   * [Modelzoo](#modelzoo)
   * [Instructions](#instructions)
@@ -26,11 +27,11 @@ Table of Contents
 ## Features
 TencentPretrain has the following features:
 - __Reproducibility__ TencentPretrain has been tested on many datasets and should match the performances of the original pre-training model implementations such as BERT, GPT-2, ELMo, T5, CLIP.
-- __Model modularity__ TencentPretrain is divided into the following components: embedding, encoder, target embedding (optional), decoder (optional), and target. Ample modules are implemented in each component. Clear and robust interface allows users to combine modules to construct pre-training models with as few restrictions as possible.
+- __Model modularity__ TencentPretrain is divided into the following parts: embedding, encoder, target embedding (optional), decoder (optional), and target. Ample modules are implemented in each part. Clear and robust interface allows users to combine modules to construct pre-training models with as few restrictions as possible.
 - __Multimodal__ TencentPretrain supports different modalities such as text, vision, and audio.
 - __Model training__ TencentPretrain supports CPU mode, single GPU mode, distributed training mode, and gigantic model training with DeepSpeed.
 - __Model zoo__ With the help of TencentPretrain, we pre-train and release models of different properties. Proper selection of pre-trained models is important to the performances of downstream tasks.
-- __SOTA results__ TencentPretrain supports comprehensive downstream tasks (e.g. classification and machine reading comprehension) and provides winning solutions of many NLP competitions.
+- __SOTA results__ TencentPretrain supports comprehensive downstream tasks (e.g. classification and machine reading comprehension) and provides winning solutions of many competitions.
 - __Abundant functions__ TencentPretrain provides abundant functions related with pre-training, such as feature extractor and text generation.
 
 
@@ -57,7 +58,7 @@ TencentPretrain has the following features:
 <br/>
 
 ## Quickstart
-This section uses several commonly-used examples to demonstrate how to use TencentPretrain. More details are discussed in Instructions section. We firstly use BERT (a text pre-training model) on Douban book review classification dataset. We pre-train model on book review corpus and then fine-tune it on book review classification dataset. There are three input files: book review corpus, book review classification dataset, and vocabulary. All files are encoded in UTF-8 and included in this project.
+This section uses several commonly-used examples to demonstrate how to use TencentPretrain. More details are discussed in Instructions section. We firstly use BERT (a text pre-training model) on book review sentiment classification dataset. The dataset is collected by [this paper](http://www.cips-cl.org/static/anthology/CCL-2018/CCL-18-086.pdf) and is available [here](https://github.com/Embedding/Embedding.github.io/blob/master/extrinsic_eval_data.zip). We pre-train model on book review corpus and then fine-tune it on book review sentiment classification dataset. There are three input files: book review corpus, book review sentiment classification dataset, and vocabulary. All files are encoded in UTF-8 and included in this project.
 
 The format of the corpus for BERT is as follows (one sentence per line and documents are delimited by empty lines)：
 ```
@@ -70,7 +71,7 @@ doc2-sent1
 doc3-sent1
 doc3-sent2
 ```
-The book review corpus is obtained from book review classification dataset. We remove labels and split a review into two parts from the middle to construct a document with two sentences (see *book_review_bert.txt* in *corpora* folder). 
+The book review corpus is obtained from book review sentiment classification dataset. We remove labels and split a review into two parts from the middle to construct a document with two sentences (see *book_review_bert.txt* in *corpora* folder). 
 
 The format of the classification dataset is as follows:
 ```
@@ -89,7 +90,6 @@ python3 preprocess.py --corpus_path corpora/book_review_bert.txt --vocab_path mo
                       --dataset_path dataset.pt --processes_num 8 --data_processor bert
 ```
 Notice that *six>=1.12.0* is required.
-
 
 Pre-processing is time-consuming. Using multiple processes can largely accelerate the pre-processing speed (*--processes_num*). BERT tokenizer is used in default (*--tokenizer bert*). After pre-processing, the raw text is converted to *dataset.pt*, which is the input of *pretrain.py*. Then we download Google's pre-trained Chinese BERT model [*google_zh_model.bin*](https://share.weiyun.com/FR4rPxc4) (in TencentPretrain format and the original model is from [here](https://github.com/google-research/bert)), and put it in *models* folder. We load the pre-trained Chinese BERT model and further pre-train it on book review corpus. Pre-training model is usually composed of embedding, encoder, and target layers. To build a pre-training model, we should provide related information. Configuration file (*--config_path*) specifies the modules and hyper-parameters used by pre-training models. More details can be found in *models/bert/base_config.json*. Suppose we have a machine with 8 GPUs:
 ```
@@ -126,17 +126,21 @@ python3 inference/run_classifier_infer.py --load_model_path models/finetuned_mod
 ```
 *--test_path* specifies the path of the file to be predicted. The file should contain text_a column.
 *--prediction_path* specifies the path of the file with prediction results.
-We need to explicitly specify the number of labels by *--labels_num*. Douban book review is a two-way classification dataset.
+We need to explicitly specify the number of labels by *--labels_num*. The above dataset is a two-way classification dataset.
 
 <br>
 
 The above content provides basic ways of using TencentPretrain to pre-process, pre-train, fine-tune, and do inference. More use cases can be found in complete :arrow_right: [__quickstart__](https://github.com/Tencent/TencentPretrain/wiki/Quickstart) :arrow_left: . The complete quickstart contains abundant use cases, covering most of the pre-training related application scenarios. It is recommended that users read the complete quickstart in order to use the project reasonably.
 
+<br/>
+
+## Pre-training data
+This section provides links to a range of :arrow_right: [__pre-training data__](https://github.com/Tencent/TencentPretrain/wiki/Pre-training-data) :arrow_left: (in other open source projects).
 
 <br/>
 
-## Datasets
-We collected a range of :arrow_right: [__downstream datasets__](https://github.com/Tencent/TencentPretrain/wiki/Datasets) :arrow_left: and converted them into the format that TencentPretrain can load directly.
+## Downstream datasets
+This section provides links to a range of :arrow_right: [__downstream datasets__](https://github.com/Tencent/TencentPretrain/wiki/Downstream-atasets) :arrow_left: (in other open source projects). TencentPretrain can load these datasets directly.
 
 <br/>
 
@@ -150,16 +154,17 @@ TencentPretrain is organized as follows：
 ```
 TencentPretrain/
     |--tencentpretrain/
-    |    |--embeddings/ # contains embeddings
-    |    |--encoders/ # contains encoders such as RNN, CNN, 
-    |    |--decoders/ # contains decoders
-    |    |--targets/ # contains targets such as language modeling, masked language modeling
-    |    |--layers/ # contains frequently-used NN layers, such as embedding layer, normalization layer
-    |    |--models/ # contains model.py, which combines embedding, encoder, and target modules
+    |    |--embeddings/ # contains embedding modules
+    |    |--encoders/ # contains encoder modules such as RNN, CNN, Transformer
+    |    |--decoders/ # contains decoder modules
+    |    |--targets/ # contains target modules such as language modeling, masked language modeling
+    |    |--layers/ # contains frequently-used NN layers, such as normalization layer
+    |    |--models/ # contains model.py, which combines modules of different parts
     |    |--utils/ # contains frequently-used utilities
     |    |--model_builder.py
     |    |--model_loader.py
     |    |--model_saver.py
+    |    |--opts.py
     |    |--trainer.py
     |
     |--corpora/ # contains pre-training data
@@ -174,7 +179,7 @@ TencentPretrain/
     |--README.md
     |--README_ZH.md
     |--requirements.txt
-    |--logo.jpg
+    |--LICENSE
 
 ```
 
