@@ -106,9 +106,9 @@ mv models/book_review_model.bin-5000 models/book_review_model.bin
 python3 finetune/run_classifier.py --pretrained_model_path models/book_review_model.bin \
                                    --vocab_path models/google_zh_vocab.txt \
                                    --config_path models/bert/base_config.json \
-                                   --train_path datasets/douban_book_review/train.tsv \
-                                   --dev_path datasets/douban_book_review/dev.tsv \
-                                   --test_path datasets/douban_book_review/test.tsv \
+                                   --train_path datasets/book_review/train.tsv \
+                                   --dev_path datasets/book_review/dev.tsv \
+                                   --test_path datasets/book_review/test.tsv \
                                    --epochs_num 3 --batch_size 32
 ``` 
 
@@ -117,8 +117,8 @@ python3 finetune/run_classifier.py --pretrained_model_path models/book_review_mo
 python3 inference/run_classifier_infer.py --load_model_path models/finetuned_model.bin \
                                           --vocab_path models/google_zh_vocab.txt \
                                           --config_path models/bert/base_config.json \
-                                          --test_path datasets/douban_book_review/test_nolabel.tsv \
-                                          --prediction_path datasets/douban_book_review/prediction.tsv \
+                                          --test_path datasets/book_review/test_nolabel.tsv \
+                                          --prediction_path datasets/book_review/prediction.tsv \
                                           --labels_num 2
 ```
 *--test_path* 指定需要预测的文件，文件需要包括text_a列；
