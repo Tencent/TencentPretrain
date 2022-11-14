@@ -61,8 +61,8 @@ class Text2text(torch.nn.Module):
         else:
             decoder_emb = self.tgt_embedding(tgt_in, tgt_seg)
             hidden = self.decoder(memory_bank, decoder_emb, (seg,))
-            loss = self.target(hidden, tgt_out, seg)[0]
-            return loss
+            loss = self.target(hidden, tgt_out, None)[0]
+            return loss, None
 
 
 def read_dataset(args, path):
@@ -136,7 +136,7 @@ def train_model(args, model, optimizer, scheduler, src_batch, tgt_in_batch, tgt_
     seg_batch = seg_batch.to(args.device)
     tgt_seg_batch = tgt_seg_batch.to(args.device)
 
-    loss = model(src_batch, (tgt_in_batch, tgt_out_batch, src_batch), seg_batch, tgt_seg_batch)
+    loss, _ = model(src_batch, (tgt_in_batch, tgt_out_batch, src_batch), seg_batch, tgt_seg_batch)
 
     if torch.cuda.device_count() > 1:
         loss = torch.mean(loss)
@@ -171,7 +171,7 @@ def evaluate(args, dataset):
         tgt_seg_batch  = torch.ones(tgt_in_batch.size()[0], 1, dtype=torch.long, device=args.device)
         for j in range(tgt_in_batch.size()[0]):
             tgt_in_batch[j][-1] = args.tokenizer.vocab.get(CLS_TOKEN)
-        
+
         seg_batch = seg_batch.to(args.device)
 
         with torch.no_grad():
@@ -188,7 +188,6 @@ def evaluate(args, dataset):
             tgt_seg_batch  = torch.ones(tgt_in_batch.size()[0], tgt_in_batch.size()[1], dtype=torch.long, device=args.device)
         for j in range(len(outputs)):
             sentence = " ".join([args.tokenizer.inv_vocab[token_id.item()] for token_id in tgt_in_batch[j][1:]])
-            print(sentence)
             generated_sentences.append(sentence)
 
     labels = {}
@@ -299,7 +298,7 @@ def main():
         result = evaluate(args, read_dataset(args, args.dev_path))
         if result > best_result:
             best_result = result
-        save_model(model, args.output_model_path)
+            save_model(model, args.output_model_path)
 
     # Evaluation phase.
     if args.test_path is not None:
