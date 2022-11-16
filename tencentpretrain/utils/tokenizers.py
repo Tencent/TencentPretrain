@@ -581,10 +581,17 @@ def _is_punctuation(char):
 
 
 class ImageTokenizer(Tokenizer):
-    """ Virtual tokenizer for model building  """
+    """ Virtual tokenizer for vqgan models """
 
     def __init__(self, args, is_src=True):
         self.vocab = range(args.image_tokenizer["image_vocab_size"])
+
+
+class VirtualTokenizer(Tokenizer):
+    """ Virtual tokenizer for vit models """
+
+    def __init__(self, args, is_src=True):
+        self.vocab = []
 
 
 class TextImageTokenizer(BertTokenizer):
