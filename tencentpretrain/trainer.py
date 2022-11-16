@@ -423,7 +423,23 @@ class PrefixlmTrainer(MlmTrainer):
 
 
 class VitTrainer(ClsTrainer):
-    pass
+    def report_and_reset_stats(self):
+        done_tokens = self.batch_size * self.seq_length * self.report_steps
+        if self.dist_train:
+            done_tokens *= self.world_size
+        self.logger.info("| {:8d}/{:8d} steps"
+                         "| {:8.2f} patches/s"
+                         "| loss {:7.2f}"
+                         "| acc: {:3.3f}".format(
+            self.current_step,
+            self.total_steps,
+            done_tokens / (time.time() - self.start_time),
+            self.total_loss / self.report_steps,
+            self.total_correct / self.total_instances))
+
+        self.total_loss = 0.0
+        self.total_correct = 0.0
+        self.total_instances = 0.0
 
 
 class ViltTrainer(BertTrainer):
