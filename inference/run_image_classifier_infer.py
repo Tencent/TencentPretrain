@@ -42,7 +42,7 @@ def data_loader(args, path):
             line = line.rstrip("\r\n").split("\t")
             path = line[columns["path"]]
             image = read_image(path, ImageReadMode.RGB)
-
+            image =  image.to(args.device)
             src = transform(image)
             seg = [1] * ((src.size()[1] // args.patch_size) * (src.size()[2] // args.patch_size) + 1)
 
