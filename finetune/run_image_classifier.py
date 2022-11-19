@@ -112,6 +112,7 @@ def main():
 
     # Load the hyperparameters from the config file.
     args = load_hyperparam(args)
+    args.soft_targets, args.soft_alpha = False, 0
 
     # Count the number of labels.
     args.labels_num = count_labels_num(args.train_path)
