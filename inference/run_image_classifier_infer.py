@@ -81,8 +81,8 @@ def main():
     model = load_model(model, args.load_model_path)
 
     # For simplicity, we use DataParallel wrapper to use multiple GPUs.
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
+    args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(args.device)
     if torch.cuda.device_count() > 1:
         print("{} GPUs are available. Let's use them.".format(torch.cuda.device_count()))
         model = torch.nn.DataParallel(model)
@@ -97,8 +97,8 @@ def main():
             f.write("\t" + "prob")
         f.write("\n")
         for i, (src_batch, seg_batch) in enumerate(data_loader(args, args.test_path)):
-            src_batch = src_batch.to(device)
-            seg_batch = seg_batch.to(device)
+            src_batch = src_batch.to(args.device)
+            seg_batch = seg_batch.to(args.device)
             with torch.no_grad():
                 _, logits = model(src_batch, None, seg_batch)
 
