@@ -593,6 +593,7 @@ class VitDataloader(VisionDataloader):
             for ins in instances:
 
                 image = read_image(ins[1], ImageReadMode.RGB)
+                image = image.cuda(self.proc_id)
                 src.append(self.transform(image))
                 tgt.append(ins[0])
                 seg.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
@@ -657,6 +658,7 @@ class ViltDataloader(VisionDataloader):
 
                 seg_image = [2] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1)
                 tgt_mlm[-1].extend([0] * len(seg_image))
+                image = image.cuda(self.proc_id)
                 src_image_single = self.transform(image)
                 src_image.append(src_image_single)
                 seg.append([1] * ins[1][0] + [0] * pad_num + seg_image)
@@ -710,6 +712,7 @@ class ClipDataloader(VisionDataloader):
                 src_text.append(src_text_single)
                 seg_text.append([1] * ins[1][0] + [0] * pad_num)
                 image = read_image(ins[2], ImageReadMode.RGB)
+                image = image.cuda(self.proc_id)
                 src_image.append(self.transform(image))
                 seg_image.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
 
@@ -856,9 +859,10 @@ class BeitDataloader(VisionDataloader):
             for ins in instances:
 
                 image = read_image(ins, ImageReadMode.RGB)
+                image = image.cuda(self.proc_id)
                 image = self.transform(image)
                 src.append(image)
-                image_tokens = [0] + image_tokenize(self.vqgan, image.cuda(self.proc_id))
+                image_tokens = [0] + image_tokenize(self.vqgan, image)
                 tgt_single, mask_index = self.mask(image_tokens)
                 tgt.append(tgt_single)
                 mask.append(mask_index)
@@ -901,8 +905,9 @@ class DalleDataloader(VisionDataloader):
                 src_single, pad_num = ins[0]
 
                 image = read_image(ins[2], ImageReadMode.RGB)
+                image = image.cuda(self.proc_id)
                 image = self.transform(image)
-                image_tokens = [i + self.vocab_bias for i in image_tokenize(self.vqgan, image.cuda(self.proc_id))]
+                image_tokens = [i + self.vocab_bias for i in image_tokenize(self.vqgan, image)]
                 src_single.extend(image_tokens)
                 for _ in range(pad_num):
                     src_single.append(self.vocab.get(PAD_TOKEN))
