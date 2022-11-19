@@ -1,5 +1,5 @@
 """
-This script provides an exmaple to wrap UER-py for classification.
+This script provides an exmaple to wrap TencentPretrain for image classification.
 """
 import sys
 import os
@@ -22,15 +22,11 @@ from tencentpretrain.utils.constants import *
 from tencentpretrain.utils import *
 from tencentpretrain.utils.optimizers import *
 from tencentpretrain.utils.config import load_hyperparam
+from tencentpretrain.utils.misc import ZeroOneNormalize
 from tencentpretrain.utils.seed import set_seed
 from tencentpretrain.model_saver import save_model
 from tencentpretrain.opts import finetune_opts
 from finetune.run_classifier import *
-
-
-class ZeroOneNormalize(object):
-    def __call__(self, img):
-        return img.float().div(255)
 
 
 def data_loader(args, path):
@@ -51,10 +47,8 @@ def data_loader(args, path):
             line = line.rstrip("\r\n").split("\t")
             tgt = int(line[columns["label"]])
             path = line[columns["path"]]
-            try:
-                image = read_image(path, ImageReadMode.RGB)
-            except:
-                print(path)
+            image = read_image(path, ImageReadMode.RGB)
+
             src = transform(image)
             seg = [1] * ((src.size()[1] // args.patch_size) * (src.size()[2] // args.patch_size) + 1)
 
@@ -71,13 +65,13 @@ def data_loader(args, path):
 
 def evaluate(args, dataset_path, print_confusion_matrix=False):
 
-    correct = 0
+    correct, data_num = 0, 0
     # Confusion matrix.
     confusion = torch.zeros(args.labels_num, args.labels_num, dtype=torch.long)
 
     args.model.eval()
 
-    for i, (src_batch, tgt_batch, seg_batch, _) in enumerate(data_loader(args, dataset_path)):
+    for i, (src_batch, tgt_batch, seg_batch) in enumerate(data_loader(args, dataset_path)):
         src_batch = src_batch.to(args.device)
         tgt_batch = tgt_batch.to(args.device)
         seg_batch = seg_batch.to(args.device)
@@ -88,37 +82,21 @@ def evaluate(args, dataset_path, print_confusion_matrix=False):
         for j in range(pred.size()[0]):
             confusion[pred[j], gold[j]] += 1
         correct += torch.sum(pred == gold).item()
+        data_num += len(pred)
 
-    if print_confusion_matrix:
-        args.logger.info("Confusion matrix:")
-        args.logger.info(confusion)
-        args.logger.info("Report precision, recall, and f1:")
+    args.logger.info("Confusion matrix:")
+    args.logger.info(confusion)
+    args.logger.info("Report precision, recall, and f1:")
 
-        eps = 1e-9
-        for i in range(confusion.size()[0]):
-            p = confusion[i, i].item() / (confusion[i, :].sum().item() + eps)
-            r = confusion[i, i].item() / (confusion[:, i].sum().item() + eps)
-            f1 = 2 * p * r / (p + r + eps)
-            args.logger.info("Label {}: {:.3f}, {:.3f}, {:.3f}".format(i, p, r, f1))
+    eps = 1e-9
+    for i in range(confusion.size()[0]):
+        p = confusion[i, i].item() / (confusion[i, :].sum().item() + eps)
+        r = confusion[i, i].item() / (confusion[:, i].sum().item() + eps)
+        f1 = 2 * p * r / (p + r + eps)
+        args.logger.info("Label {}: {:.3f}, {:.3f}, {:.3f}".format(i, p, r, f1))
 
-    args.logger.info("Acc. (Correct/Total): {:.4f} ({}/{}) ".format(correct / len(dataset), correct, len(dataset)))
-    return correct / len(dataset), confusion
-
-
-def count_labels_num(path):
-    labels_set, columns = set(), {}
-    counter = 0
-    with open(path, mode="r", encoding="utf-8") as f:
-        for line_id, line in enumerate(f):
-            if line_id == 0:
-                for i, column_name in enumerate(line.rstrip("\r\n").split("\t")):
-                    columns[column_name] = i
-                continue
-            counter += 1
-            line = line.rstrip("\r\n").split("\t")
-            label = int(line[columns["label"]])
-            labels_set.add(label)
-    return len(labels_set), counter
+    args.logger.info("Acc. (Correct/Total): {:.4f} ({}/{}) ".format(correct / data_num, correct, data_num))
+    return correct / data_num, confusion
 
 
 def main():
@@ -128,11 +106,6 @@ def main():
 
     tokenizer_opts(parser)
 
-    parser.add_argument("--soft_targets", action='store_true',
-                        help="Train model with logits.")
-    parser.add_argument("--soft_alpha", type=float, default=0.5,
-                        help="Weight of the soft targets loss.")
-
     adv_opts(parser)
 
     args = parser.parse_args()
@@ -140,13 +113,13 @@ def main():
     # Load the hyperparameters from the config file.
     args = load_hyperparam(args)
 
-    set_seed(args.seed)
-
     # Count the number of labels.
-    args.labels_num, instances_num = count_labels_num(args.train_path)
+    args.labels_num = count_labels_num(args.train_path)
+    instances_num = len(open(args.train_path,'r').readlines()) - 1
+
 
     # Build tokenizer.
-    args.tokenizer = str2tokenizer["none"](args)
+    args.tokenizer = str2tokenizer["virtual"](args)
     set_seed(args.seed)
 
     # Build classification model.
@@ -183,6 +156,9 @@ def main():
         model = torch.nn.DataParallel(model)
     args.model = model
 
+    if args.use_adv:
+        args.adv_method = str2adv[args.adv_type](model)
+
     total_loss, result, best_result = 0.0, 0.0, 0.0
 
     args.logger.info("Start training.")
@@ -200,6 +176,14 @@ def main():
             best_result = result[0]
             save_model(model, args.output_model_path)
 
+    # Evaluation phase.
+    if args.test_path is not None:
+        args.logger.info("Test set evaluation.")
+        if torch.cuda.device_count() > 1:
+            args.model.module.load_state_dict(torch.load(args.output_model_path))
+        else:
+            args.model.load_state_dict(torch.load(args.output_model_path))
+        evaluate(args, args.test_path)
 
 if __name__ == "__main__":
     main()

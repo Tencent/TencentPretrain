@@ -7,7 +7,7 @@ from tencentpretrain.utils.adversarial import *
 
 str2tokenizer = {"char": CharTokenizer, "space": SpaceTokenizer, "bert": BertTokenizer,
                  "bpe": BPETokenizer, "xlmroberta": XLMRobertaTokenizer, "image": ImageTokenizer,
-                 "text_image": TextImageTokenizer, "none": VirtualTokenizer}
+                 "text_image": TextImageTokenizer, "virtual": VirtualTokenizer}
 str2dataset = {"bert": BertDataset, "lm": LmDataset, "mlm": MlmDataset,
                "bilm": BilmDataset, "albert": AlbertDataset, "mt": MtDataset,
                "t5": T5Dataset, "gsg": GsgDataset, "bart": BartDataset,

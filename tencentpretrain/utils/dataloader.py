@@ -545,21 +545,10 @@ class VisionDataloader(Dataloader):
         self.image_width = args.image_width
 
         from torchvision import transforms
-        from PIL import Image
 
-        def convert_color(image, channel):
-            if channel == 3:
-                if image.mode == 'RGBA':
-                    r, g, b, a = image.split()
-                    image = Image.merge("RGB", (r, g, b))
-                elif image.mode != 'RGB':
-                    image = image.convert("RGBA")
-                    r, g, b, a = image.split()
-                    image = Image.merge("RGB", (r, g, b))
-            elif channel == 1:
-                image = image.convert("L")
-
-            return image
+        class ZeroOneNormalize(object):
+            def __call__(self, img):
+                return img.float().div(255)
 
         preprocess_pipeline = []
         if "corp" in args.image_preprocess:
@@ -567,8 +556,7 @@ class VisionDataloader(Dataloader):
         if "horizontal_flip" in args.image_preprocess:
             preprocess_pipeline.append(transforms.RandomHorizontalFlip())
         preprocess_pipeline.append(transforms.Resize((self.image_height, self.image_width)))
-        preprocess_pipeline.append(transforms.Lambda(lambda img: convert_color(img, args.channels_num)))
-        preprocess_pipeline.append(transforms.ToTensor())
+        preprocess_pipeline.append(ZeroOneNormalize())
         if "normalize" in args.image_preprocess:
             preprocess_pipeline.append(transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)))
         self.transform = transforms.Compose(preprocess_pipeline)
@@ -586,7 +574,8 @@ class VitDataloader(VisionDataloader):
             seg: [batch_size x (patch_num + 1)]
             tgt: [batch_size]
         """
-        from PIL import Image
+        from torchvision.io import read_image
+        from torchvision.io.image import ImageReadMode
         while True:
             while self._empty():
                 self._fill_buf()
@@ -603,7 +592,7 @@ class VitDataloader(VisionDataloader):
 
             for ins in instances:
 
-                image = Image.open(ins[1])
+                image = read_image(ins[1], ImageReadMode.RGB)
                 src.append(self.transform(image))
                 tgt.append(ins[0])
                 seg.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
@@ -628,7 +617,8 @@ class ViltDataloader(VisionDataloader):
             tgt_match: [batch_size]
             seg: [batch_size x (seq_length + patch_num + 1)]
         """
-        from PIL import Image
+        from torchvision.io import read_image
+        from torchvision.io.image import ImageReadMode
         while True:
             while self._empty():
                 self._fill_buf()
@@ -659,10 +649,10 @@ class ViltDataloader(VisionDataloader):
                     tgt_mlm[-1][mask[0]] = mask[1]
 
                 if random.random() < 0.5:
-                    image = Image.open(ins[2])
+                    image = read_image(ins[2], ImageReadMode.RGB)
                     tgt_match.append(1)
                 else:
-                    image = Image.open(random.choice(self.buffer)[2])
+                    image = read_image(random.choice(self.buffer)[2], ImageReadMode.RGB)
                     tgt_match.append(0)
 
                 seg_image = [2] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1)
@@ -696,7 +686,8 @@ class ClipDataloader(VisionDataloader):
             seg_text: [batch_size x seq_length]
             seg_image: [batch_size x (patch_num + 1)]
         """
-        from PIL import Image
+        from torchvision.io import read_image
+        from torchvision.io.image import ImageReadMode
         while True:
             while self._empty():
                 self._fill_buf()
@@ -718,7 +709,7 @@ class ClipDataloader(VisionDataloader):
 
                 src_text.append(src_text_single)
                 seg_text.append([1] * ins[1][0] + [0] * pad_num)
-                image = Image.open(ins[2])
+                image = read_image(ins[2], ImageReadMode.RGB)
                 src_image.append(self.transform(image))
                 seg_image.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
 
@@ -844,7 +835,8 @@ class BeitDataloader(VisionDataloader):
             seg: [batch_size x (patch_num + 1)]
             tgt: [batch_size]
         """
-        from PIL import Image
+        from torchvision.io import read_image
+        from torchvision.io.image import ImageReadMode
         from tencentpretrain.utils.image_tokenizer import image_tokenize
 
         while True:
@@ -863,7 +855,7 @@ class BeitDataloader(VisionDataloader):
             mask = []
             for ins in instances:
 
-                image = Image.open(ins)
+                image = read_image(ins, ImageReadMode.RGB)
                 image = self.transform(image)
                 src.append(image)
                 image_tokens = [0] + image_tokenize(self.vqgan, image.cuda(self.proc_id))
@@ -888,7 +880,8 @@ class DalleDataloader(VisionDataloader):
 
 
     def __iter__(self):
-        from PIL import Image
+        from torchvision.io import read_image
+        from torchvision.io.image import ImageReadMode
         from tencentpretrain.utils.image_tokenizer import image_tokenize
 
         while True:
@@ -907,7 +900,7 @@ class DalleDataloader(VisionDataloader):
             for ins in instances:
                 src_single, pad_num = ins[0]
 
-                image = Image.open(ins[2])
+                image = read_image(ins[2], ImageReadMode.RGB)
                 image = self.transform(image)
                 image_tokens = [i + self.vocab_bias for i in image_tokenize(self.vqgan, image.cuda(self.proc_id))]
                 src_single.extend(image_tokens)
