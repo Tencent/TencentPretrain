@@ -24,8 +24,6 @@ from tencentpretrain.utils.misc import ZeroOneNormalize
 from finetune.run_classifier import Classifier
 
 
-
-
 def data_loader(args, path):
 
     transform = transforms.Compose([
