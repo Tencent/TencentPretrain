@@ -73,7 +73,7 @@ def main():
     args = load_hyperparam(args)
 
     # Build tokenizer.
-    args.tokenizer = str2tokenizer[args.tokenizer](args)
+    args.tokenizer = str2tokenizer["virtual"](args)
 
     # Build classification model and load parameters.
     args.soft_targets, args.soft_alpha = False, False

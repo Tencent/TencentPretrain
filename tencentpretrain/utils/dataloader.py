@@ -545,10 +545,7 @@ class VisionDataloader(Dataloader):
         self.image_width = args.image_width
 
         from torchvision import transforms
-
-        class ZeroOneNormalize(object):
-            def __call__(self, img):
-                return img.float().div(255)
+        from tencentpretrain.utils.misc import ZeroOneNormalize
 
         preprocess_pipeline = []
         if "corp" in args.image_preprocess:
