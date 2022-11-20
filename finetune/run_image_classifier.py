@@ -22,7 +22,7 @@ from tencentpretrain.utils.constants import *
 from tencentpretrain.utils import *
 from tencentpretrain.utils.optimizers import *
 from tencentpretrain.utils.config import load_hyperparam
-from tencentpretrain.utils.misc import ZeroOneNormalize
+from tencentpretrain.utils.misc import ZeroOneNormalize, count_lines
 from tencentpretrain.utils.seed import set_seed
 from tencentpretrain.model_saver import save_model
 from tencentpretrain.opts import finetune_opts
@@ -63,9 +63,9 @@ def data_loader(args, path):
                 src_batch, tgt_batch, seg_batch = [], [], []
 
 
-def evaluate(args, dataset_path, print_confusion_matrix=False):
+def evaluate(args, dataset_path):
 
-    correct, data_num = 0, 0
+    correct, instances_num = 0, 0
     # Confusion matrix.
     confusion = torch.zeros(args.labels_num, args.labels_num, dtype=torch.long)
 
@@ -82,7 +82,7 @@ def evaluate(args, dataset_path, print_confusion_matrix=False):
         for j in range(pred.size()[0]):
             confusion[pred[j], gold[j]] += 1
         correct += torch.sum(pred == gold).item()
-        data_num += len(pred)
+        instances_num += len(pred)
 
     args.logger.info("Confusion matrix:")
     args.logger.info(confusion)
@@ -95,8 +95,8 @@ def evaluate(args, dataset_path, print_confusion_matrix=False):
         f1 = 2 * p * r / (p + r + eps)
         args.logger.info("Label {}: {:.3f}, {:.3f}, {:.3f}".format(i, p, r, f1))
 
-    args.logger.info("Acc. (Correct/Total): {:.4f} ({}/{}) ".format(correct / data_num, correct, data_num))
-    return correct / data_num, confusion
+    args.logger.info("Acc. (Correct/Total): {:.4f} ({}/{}) ".format(correct / instances_num, correct, instances_num))
+    return correct / instances_num, confusion
 
 
 def main():
@@ -116,7 +116,7 @@ def main():
 
     # Count the number of labels.
     args.labels_num = count_labels_num(args.train_path)
-    instances_num = len(open(args.train_path,'r').readlines()) - 1
+    instances_num = count_lines(args.train_path) - 1
 
 
     # Build tokenizer.

@@ -546,7 +546,8 @@ class VisionDataloader(Dataloader):
 
         from torchvision import transforms
         from tencentpretrain.utils.misc import ZeroOneNormalize
-
+        from torchvision.io import read_image
+        from torchvision.io.image import ImageReadMode
         preprocess_pipeline = []
         if "corp" in args.image_preprocess:
             preprocess_pipeline.append(transforms.RandomResizedCrop(max(self.image_height, self.image_width)))
@@ -571,8 +572,7 @@ class VitDataloader(VisionDataloader):
             seg: [batch_size x (patch_num + 1)]
             tgt: [batch_size]
         """
-        from torchvision.io import read_image
-        from torchvision.io.image import ImageReadMode
+
         while True:
             while self._empty():
                 self._fill_buf()
