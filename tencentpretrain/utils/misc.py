@@ -33,3 +33,7 @@ def pooling(memory_bank, seg, pooling_type):
     else:
         features = memory_bank[:, 0, :]
     return features
+
+class ZeroOneNormalize(object):
+    def __call__(self, img):
+        return img.float().div(255)
