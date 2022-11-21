@@ -54,6 +54,11 @@ def data_loader(args, path):
                       torch.LongTensor(seg_batch)
                 src_batch, seg_batch = [], []
 
+        if len(src_batch) > 0:
+            yield torch.stack(src_batch, 0), \
+                  torch.LongTensor(seg_batch)
+
+
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 

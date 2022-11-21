@@ -62,6 +62,11 @@ def data_loader(args, path):
                       torch.LongTensor(seg_batch)
                 src_batch, tgt_batch, seg_batch = [], [], []
 
+        if len(src_batch) > 0:
+            yield torch.stack(src_batch, 0), \
+                  torch.LongTensor(tgt_batch), \
+                  torch.LongTensor(seg_batch)
+
 
 def evaluate(args, dataset_path):
 
