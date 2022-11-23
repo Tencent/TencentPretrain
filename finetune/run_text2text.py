@@ -31,15 +31,22 @@ class Text2text(torch.nn.Module):
         self.decoder = str2decoder[args.decoder](args)
         self.target = Target()
         self.target.update(LmTarget(args, len(args.tokenizer.vocab)), "lm")
-        if args.tie_weights:
+        if args.tie_weights and "word" in self.embedding.embedding_name_list:
             self.target.lm.output_layer.weight = self.embedding.word.embedding.weight
+        elif args.tie_weights and "word" in self.tgt_embedding.embedding_name_list:
+            self.target.lm.output_layer.weight = self.tgt_embedding.word.embedding.weight
         if args.share_embedding:
-            self.tgt_embedding.word.embedding.weight = self.embedding.word.embedding.weight
-
+            self.tgt_embedding.word_embedding.weight = self.embedding.word_embedding.weight
+   
     def encode(self, src, seg):
         emb = self.embedding(src, seg)
         memory_bank = self.encoder(emb, seg)
         return memory_bank
+
+    def encode_audio(self, src, seg):
+        emb = self.embedding(src, seg)
+        memory_bank = self.encoder(emb, seg)
+        return memory_bank, emb
 
     def decode(self, src, memory_bank, tgt, tgt_seg):
         tgt_in, tgt_out, _ = tgt
@@ -48,13 +55,33 @@ class Text2text(torch.nn.Module):
         output = self.target.lm.output_layer(hidden)
         return output
 
-    def forward(self, src, tgt, seg, tgt_seg, memory_bank=None, only_use_encoder=False):
-        if only_use_encoder:
-            return self.encode(src, seg)
-        if memory_bank is not None:
-            return self.decode(src, memory_bank, tgt, tgt_seg)
+    def decode_audio(self, emb, memory_bank, tgt):
         tgt_in, tgt_out, _ = tgt
-        memory_bank = self.encode(src, seg)
+        decoder_emb = self.tgt_embedding(tgt_in, None)
+        hidden = self.decoder(memory_bank, decoder_emb, [emb.abs()[:,:,0]]) #(src.abs()[:,:,0],))
+        output = self.target.lm.output_layer(hidden)
+        return output
+
+    def forward(self, src, tgt, seg, tgt_seg, memory_bank=None, only_use_encoder=False, use_audio_input=False):
+        if only_use_encoder:
+            if use_audio_input:
+                return self.encode_audio(src, seg)
+            else:
+                return self.encode(src, seg)
+        if memory_bank is not None and not use_audio_input:
+            return self.decode(src, memory_bank, tgt)
+        elif use_audio_input:
+            return self.decode_audio(src, memory_bank, tgt)
+
+        tgt_in, tgt_out, _ = tgt
+        if use_audio_input:
+            memory_bank, emb = self.encode(src, seg)
+        else:
+            memory_bank = self.encode(src, seg)
+        if use_audio_input:
+            output = self.decode_audio(emb, memory_bank, tgt)
+        else:
+            output = self.decode(src, memory_bank, tgt)
         if tgt_out is None:
             output = self.decode(src, memory_bank, tgt)
             return None, output

@@ -13,7 +13,10 @@ class TransformerDecoder(nn.Module):
 
     def __init__(self, args):
         super(TransformerDecoder, self).__init__()
-        self.layers_num = args.layers_num
+        if "decoder_layers_num" in args:
+            self.layers_num = args.decoder_layers_num
+        else:
+            self.layers_num = args.layers_num
         self.layernorm_positioning = args.layernorm_positioning
         self.relative_position_embedding = args.relative_position_embedding
         self.transformer_decoder = nn.ModuleList(
@@ -62,7 +65,6 @@ class TransformerDecoder(nn.Module):
         mask_decoder = mask_decoder.repeat(batch_size, 1, 1, 1)
 
         hidden = emb
-
         if self.relative_position_embedding:
             self_position_bias = self.self_pos_emb(hidden, hidden)
         else:

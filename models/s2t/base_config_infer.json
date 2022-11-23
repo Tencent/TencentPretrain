@@ -7,7 +7,7 @@
   "layers_num": 12,
   "decoder_layers_num": 6,
   "max_audio_frames": 6000,
-  "dropout": 0.1,
+  "dropout": 0.0,
   "data_processor": "s2t",
   "embedding": ["speech", "sinusoidalpos"],
   "tgt_embedding": ["word", "sinusoidalpos"],

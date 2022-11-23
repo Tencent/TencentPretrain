@@ -5,6 +5,7 @@ import torch
 from tencentpretrain.utils.constants import *
 from tencentpretrain.utils.tokenizers import *
 from tencentpretrain.utils.mask import mask_seq
+from tencentpretrain.utils.augment import SpecAugment
 
 
 class Dataloader(object):
@@ -729,6 +730,7 @@ class AudioDataloader(Dataloader):
         self.audio_feature_size = args.audio_feature_size
         self.conv_layers_num = args.conv_layers_num
         self.max_audio_frames = args.max_audio_frames
+        self.specaugment = None
 
         if "normalize_means" not in args.audio_preprocess:
             self.normalize_means = False
@@ -736,6 +738,8 @@ class AudioDataloader(Dataloader):
             self.normalize_vars = False
         if "ceptral_normalize" not in args.audio_preprocess:
             self.ceptral_normalize = False
+        if "sepcaugment" in args:
+            self.specaugment = SpecAugment(args)
 
     def utterance_cmvn(self, x, normalize_means, normalize_vars):
         mean = x.mean(axis=0)
@@ -778,7 +782,10 @@ class S2tDataloader(AudioDataloader):
             for ins in instances:
                 text_single, pad_num = ins[0]
                 for _ in range(pad_num):
-                    text_single.append(self.vocab.get(PAD_TOKEN))
+                    if self.tokenizer.sp_model:
+                        text_single.append(self.vocab['<pad>'])
+                    else:
+                        text_single.append(self.vocab.get(PAD_TOKEN))
 
                 waveform, _ = torchaudio.load(ins[2])  # waveform, sample_rate
                 waveform = waveform * (2 ** 15)  # Kaldi compliance: 16-bit signed integers
@@ -791,14 +798,22 @@ class S2tDataloader(AudioDataloader):
                     continue
                 else:
                     src_audio.append(torch.cat([feature] + [padding_vector] * difference))
-                seg_audio.append([1] * int(self.max_audio_frames / self.conv_layers_num / 2))
-                tgt_in.append(text_single[:-1])
+
+                src_pad_num = int(self.max_audio_frames / self.conv_layers_num / 2) - int(feature.size(0) / self.conv_layers_num / 2)
+                seg_audio.append([1] * int(feature.size(0) / self.conv_layers_num / 2) + [0] * src_pad_num)
                 tgt_out.append(text_single[1:])
+                if self.tokenizer.sp_model:
+                    text_single[-pad_num-1] = self.vocab['<pad>']
+                else:
+                    text_single[-pad_num-1] = self.vocab.get(PAD_TOKEN)
+                tgt_in.append(text_single[:-1])
                 pad_num = max(pad_num - 1, 0)  # left shifted, pad_num >= 0
                 tgt_seg.append([1] * (len(tgt_in[-1]) - pad_num) + [0] * pad_num)
 
             if len(src_audio) == 0:
                 continue
+            if self.specaugment:
+                src_audio = self.specaugment(src_audio)
 
             yield  torch.stack(src_audio, 0), \
                    torch.LongTensor(tgt_out), \

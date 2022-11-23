@@ -879,9 +879,13 @@ class FileWithTextDataset(Dataset):
 
                 text = line[0]
                 path = line[1]
-                src = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text))
-                src = src[:self.seq_length - 2]
-                src = [self.vocab.get(CLS_TOKEN)] + src + [self.vocab.get(SEP_TOKEN)]
+                if self.tokenizer.sp_model:
+                    src = [self.vocab['</s>']] + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text)) + [self.vocab['</s>']]
+                    src = src[:self.seq_length]
+                else:
+                    src = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text))
+                    src = src[:self.seq_length - 2]
+                    src = [self.vocab.get(CLS_TOKEN)] + src + [self.vocab.get(SEP_TOKEN)]
                 seg_pos = [len(src)]
 
                 pad_num = self.seq_length - len(src)
