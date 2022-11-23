@@ -36,7 +36,7 @@ class Text2text(torch.nn.Module):
         elif args.tie_weights and "word" in self.tgt_embedding.embedding_name_list:
             self.target.lm.output_layer.weight = self.tgt_embedding.word.embedding.weight
         if args.share_embedding:
-            self.tgt_embedding.word_embedding.weight = self.embedding.word_embedding.weight
+            self.tgt_embedding.word.embedding.weight = self.embedding.word.embedding.weight
    
     def encode(self, src, seg):
         emb = self.embedding(src, seg)
