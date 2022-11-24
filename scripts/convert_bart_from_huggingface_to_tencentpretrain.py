@@ -118,7 +118,7 @@ def main():
     output_model["target.lm.output_layer.weight"] = input_model["lm_head.weight"]
     output_model["target.lm.output_layer.bias"] = input_model["final_logits_bias"].squeeze(0)
 
-    convert_encoder_decoder_transformer_from_huggingface_to_uer(input_model, output_model, args.layers_num, args.decoder_layers_num)
+    convert_encoder_decoder_transformer_from_huggingface_to_tencentpretrain(input_model, output_model, args.layers_num, args.decoder_layers_num)
 
     output_model["embedding.layer_norm.gamma"] = input_model["model.encoder.layernorm_embedding.weight"]
     output_model["embedding.layer_norm.beta"] = input_model["model.encoder.layernorm_embedding.bias"]

@@ -33,7 +33,7 @@ output_model["model.decoder.embed_tokens.weight"] = input_model["tgt_embedding.w
 output_model["lm_head.weight"] = input_model["target.lm.output_layer.weight"]
 output_model["final_logits_bias"] = input_model["target.lm.output_layer.bias"].unsqueeze(0)
 
-convert_encoder_decoder_transformer_from_uer_to_huggingface(input_model, output_model, args.layers_num, args.decoder_layers_num)
+convert_encoder_decoder_transformer_from_tencentpretrain_to_huggingface(input_model, output_model, args.layers_num, args.decoder_layers_num)
 
 output_model["model.encoder.layer_norm.weight"] = input_model["encoder.layer_norm.gamma"]
 output_model["model.encoder.layer_norm.bias"] = input_model["encoder.layer_norm.beta"]
