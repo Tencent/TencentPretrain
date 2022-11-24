@@ -5,6 +5,7 @@
   "hidden_act": "relu",
   "heads_num": 16,
   "layers_num": 6,
+  "decoder_layers_num": 6,
   "max_seq_length": 512,
   "dropout": 0.3,
   "data_processor": "mt",
