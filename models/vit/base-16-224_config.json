@@ -6,12 +6,15 @@
   "heads_num": 12,
   "layers_num": 12,
   "dropout": 0.1,
+  "max_seq_length": 197,
   "data_processor": "vit",
   "embedding": ["patch", "pos"],
+  "remove_embedding_layernorm": true,
   "encoder": "transformer",
   "mask": "fully_visible",
+  "layernorm_positioning": "pre",
   "target": ["cls"],
-  "image_height": 256,
-  "image_width": 256,
-  "patch_size": 32
+  "image_height": 224,
+  "image_width": 224,
+  "patch_size": 16
 }
