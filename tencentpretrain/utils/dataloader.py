@@ -858,7 +858,7 @@ class BeitDataloader(VisionDataloader):
             for ins in instances:
 
                 image = read_image(ins, ImageReadMode.RGB)
-                image = image.cuda(self.proc_id)
+                image = image.cuda(self.gpu_id)
                 image = self.transform(image)
                 src.append(image)
                 image_tokens = [0] + image_tokenize(self.vqgan, image)
@@ -904,7 +904,7 @@ class DalleDataloader(VisionDataloader):
                 src_single, pad_num = ins[0]
 
                 image = read_image(ins[2], ImageReadMode.RGB)
-                image = image.cuda(self.proc_id)
+                image = image.cuda(self.gpu_id)
                 image = self.transform(image)
                 image_tokens = [i + self.vocab_bias for i in image_tokenize(self.vqgan, image)]
                 src_single.extend(image_tokens)
