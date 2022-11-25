@@ -25,17 +25,17 @@ def train_and_validate(args):
     args.vocab = args.tokenizer.vocab
 
     # Build model.
-    model = build_model(args)
+    model_for_training = build_model(args)
 
     # Load or initialize parameters.
     if args.pretrained_model_path is not None:
         # Initialize with pretrained model.
-        model = load_model(model, args.pretrained_model_path)
+        model_for_training = load_model(model_for_training, args.pretrained_model_path)
     else:
         # Initialize with normal distribution.
         if args.deep_init:
             scaled_factor = 1 / math.sqrt(2.0 * args.layers_num)
-            for n, p in list(model.named_parameters()):
+            for n, p in list(model_for_training.named_parameters()):
                 if "gamma" not in n and "beta" not in n:
                     if "linear_2.weight" in n or "final_linear.weight" in n:
                         p.data.normal_(0, 0.02 * scaled_factor)
@@ -44,21 +44,27 @@ def train_and_validate(args):
                     else:
                         p.data.normal_(0, 0.02)
         else:
-            for n, p in list(model.named_parameters()):
+            for n, p in list(model_for_training.named_parameters()):
                 if "gamma" not in n and "beta" not in n:
                     p.data.normal_(0, 0.02)
 
+    if args.vqgan_model_path is not None:
+        from tencentpretrain.utils.image_tokenizer import build_vqgan_model
+        model_for_dataloader = build_vqgan_model(args)
+    else:
+        model_for_dataloader = None
+
     if args.deepspeed:
-        worker(args.local_rank, None, args, model)
+        worker(args.local_rank, None, args, model_for_training, model_for_dataloader)
     elif args.dist_train:
         # Multiprocessing distributed mode.
-        mp.spawn(worker, nprocs=args.ranks_num, args=(args.gpu_ranks, args, model), daemon=False)
+        mp.spawn(worker, nprocs=args.ranks_num, args=(args.gpu_ranks, args, model_for_training, model_for_dataloader), daemon=False)
     elif args.single_gpu:
         # Single GPU mode.
-        worker(args.gpu_id, None, args, model)
+        worker(args.gpu_id, None, args, model_for_training, model_for_dataloader)
     else:
         # CPU mode.
-        worker(None, None, args, model)
+        worker(None, None, args, model_for_training, model_for_dataloader)
 
 
 class Trainer(object):
@@ -527,7 +533,7 @@ str2trainer = {"bert": BertTrainer, "mlm": MlmTrainer, "lm": LmTrainer,
                "beit": BeitTrainer, "dalle": DalleTrainer}
 
 
-def worker(proc_id, gpu_ranks, args, model):
+def worker(proc_id, gpu_ranks, args, model_for_training, model_for_dataloader=None):
     """
     Args:
         proc_id: The id of GPU for single GPU mode;
@@ -554,13 +560,8 @@ def worker(proc_id, gpu_ranks, args, model):
         rank = None
         gpu_id = None
 
-    if args.dist_train:
-        train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, rank, args.world_size, True)
-    else:
-        train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, 0, 1, True)
-
     # Build optimizer.
-    param_optimizer = list(model.named_parameters())
+    param_optimizer = list(model_for_training.named_parameters())
     no_decay = ["bias", "gamma", "beta"]
     optimizer_grouped_parameters = [
         {"params": [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], "weight_decay": 0.01},
@@ -579,8 +580,8 @@ def worker(proc_id, gpu_ranks, args, model):
         custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps*args.warmup, args.total_steps)
 
     if args.deepspeed:
-        model, optimizer, _, scheduler = deepspeed.initialize(
-                                                    model=model,
+        model_for_training, optimizer, _, scheduler = deepspeed.initialize(
+                                                    model=model_for_training,
                                                     model_parameters=optimizer_grouped_parameters,
                                                     args=args,
                                                     optimizer=custom_optimizer,
@@ -589,7 +590,9 @@ def worker(proc_id, gpu_ranks, args, model):
                                                     dist_init_required=False)
     else:
         if gpu_id is not None:
-            model.cuda(gpu_id)
+            model_for_training.cuda(gpu_id)
+            if model_for_dataloader is not None:
+                model_for_dataloader.cuda(gpu_id)
         optimizer = custom_optimizer
         scheduler = custom_scheduler
         if args.fp16:
@@ -597,7 +600,7 @@ def worker(proc_id, gpu_ranks, args, model):
                 from apex import amp
             except ImportError:
                 raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
-            model, optimizer = amp.initialize(model, optimizer, opt_level=args.fp16_opt_level)
+            model_for_training, optimizer = amp.initialize(model_for_training, optimizer, opt_level=args.fp16_opt_level)
             args.amp = amp
 
         if args.dist_train:
@@ -606,10 +609,20 @@ def worker(proc_id, gpu_ranks, args, model):
                                     init_method=args.master_ip,
                                     world_size=args.world_size,
                                     rank=rank)
-            model = DistributedDataParallel(model, device_ids=[gpu_id], find_unused_parameters=True)
+            model_for_training = DistributedDataParallel(model_for_training, device_ids=[gpu_id], find_unused_parameters=True)
+            model_for_dataloader = DistributedDataParallel(model_for_dataloader, device_ids=[gpu_id], find_unused_parameters=False)
             args.logger.info("Worker %d is training ... " % rank)
         else:
             args.logger.info("Worker is training ...")
 
+    if args.dist_train:
+        if model_for_dataloader is not None:
+            train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, rank, args.world_size, gpu_id, True, model_for_dataloader.module)
+        else:
+            train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, rank, args.world_size, gpu_id, True, None)
+    else:
+        train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, 0, 1, gpu_id, True, model_for_dataloader)
+
+
     trainer = str2trainer[args.data_processor](args)
-    trainer.train(args, gpu_id, rank, train_loader, model, optimizer, scheduler)
+    trainer.train(args, gpu_id, rank, train_loader, model_for_training, optimizer, scheduler)

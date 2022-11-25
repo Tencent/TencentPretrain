@@ -8,13 +8,15 @@ from tencentpretrain.utils.mask import mask_seq
 
 
 class Dataloader(object):
-    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, shuffle=False):
+    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, gpu_id, shuffle=False, model_for_dataloader=None):
         self.tokenizer = args.tokenizer
         self.batch_size = batch_size
         self.instances_buffer_size = args.instances_buffer_size
         self.proc_id = proc_id
         self.proc_num = proc_num
+        self.gpu_id = gpu_id
         self.shuffle = shuffle
+        self.model_for_dataloader = model_for_dataloader
         self.dataset_reader = open(dataset_path, "rb")
         self.read_count = 0
         self.start = 0
@@ -812,7 +814,7 @@ class BeitDataloader(VisionDataloader):
     def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, shuffle=False):
         super(BeitDataloader, self).__init__(args, dataset_path, batch_size, proc_id, proc_num, shuffle)
         from tencentpretrain.utils.image_tokenizer import build_vqgan_model
-        self.vqgan = build_vqgan_model(args).cuda(proc_id)
+        self.vqgan = self.model_for_dataloader
 
 
     def mask(self, image_tokens, mask_rate = 0.15):
@@ -876,7 +878,7 @@ class DalleDataloader(VisionDataloader):
     def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, shuffle=False):
         super(DalleDataloader, self).__init__(args, dataset_path, batch_size, proc_id, proc_num, shuffle)
         from tencentpretrain.utils.image_tokenizer import build_vqgan_model
-        self.vqgan = build_vqgan_model(args).cuda(self.proc_id)
+        self.vqgan = self.model_for_dataloader
         self.vocab_bias = args.tokenizer.vocab_bias
 
 
