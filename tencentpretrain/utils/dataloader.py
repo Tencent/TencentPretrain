@@ -592,7 +592,7 @@ class VitDataloader(VisionDataloader):
             for ins in instances:
 
                 image = read_image(ins[1], ImageReadMode.RGB)
-                image = image.cuda(self.proc_id)
+                image = image.cuda(self.gpu_id)
                 src.append(self.transform(image))
                 tgt.append(ins[0])
                 seg.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
@@ -657,7 +657,7 @@ class ViltDataloader(VisionDataloader):
 
                 seg_image = [2] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1)
                 tgt_mlm[-1].extend([0] * len(seg_image))
-                image = image.cuda(self.proc_id)
+                image = image.cuda(self.gpu_id)
                 src_image_single = self.transform(image)
                 src_image.append(src_image_single)
                 seg.append([1] * ins[1][0] + [0] * pad_num + seg_image)
@@ -711,7 +711,7 @@ class ClipDataloader(VisionDataloader):
                 src_text.append(src_text_single)
                 seg_text.append([1] * ins[1][0] + [0] * pad_num)
                 image = read_image(ins[2], ImageReadMode.RGB)
-                image = image.cuda(self.proc_id)
+                image = image.cuda(self.gpu_id)
                 src_image.append(self.transform(image))
                 seg_image.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
 
