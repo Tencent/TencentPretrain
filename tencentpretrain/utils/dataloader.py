@@ -8,12 +8,12 @@ from tencentpretrain.utils.mask import mask_seq
 
 
 class Dataloader(object):
-    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, gpu_id, shuffle=False, model_for_dataloader=None):
+    def __init__(self, args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle=False, model_for_dataloader=None):
         self.tokenizer = args.tokenizer
         self.batch_size = batch_size
         self.instances_buffer_size = args.instances_buffer_size
-        self.proc_id = proc_id
-        self.proc_num = proc_num
+        self.rank = rank
+        self.world_size = world_size
         self.gpu_id = gpu_id
         self.shuffle = shuffle
         self.model_for_dataloader = model_for_dataloader
@@ -34,7 +34,7 @@ class Dataloader(object):
             while True:
                 instance = pickle.load(self.dataset_reader)
                 self.read_count += 1
-                if (self.read_count - 1) % self.proc_num == self.proc_id:
+                if (self.read_count - 1) % self.world_size == self.rank:
                     self.buffer.append(instance)
                     if len(self.buffer) >= self.instances_buffer_size:
                         break
@@ -540,8 +540,8 @@ class ClsMlmDataloader(Dataloader):
 
 
 class VisionDataloader(Dataloader):
-    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, gpu_id, shuffle=False, model_for_dataloader=None):
-        super(VisionDataloader, self).__init__(args, dataset_path, batch_size, proc_id, proc_num, gpu_id, shuffle, model_for_dataloader)
+    def __init__(self, args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle=False, model_for_dataloader=None):
+        super(VisionDataloader, self).__init__(args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle, model_for_dataloader)
         self.patch_size = args.patch_size
         self.image_height = args.image_height
         self.image_width = args.image_width
@@ -722,8 +722,8 @@ class ClipDataloader(VisionDataloader):
 
 
 class AudioDataloader(Dataloader):
-    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, gpu_id, shuffle=False, model_for_dataloader=None):
-        super(AudioDataloader, self).__init__(args, dataset_path, batch_size, proc_id, proc_num, gpu_id, shuffle, model_for_dataloader)
+    def __init__(self, args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle=False, model_for_dataloader=None):
+        super(AudioDataloader, self).__init__(args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle, model_for_dataloader)
         self.dataset_folder = os.path.dirname(dataset_path)
         self.sampling_rate = args.sampling_rate
         self.normalize_means, self.normalize_vars, self.ceptral_normalize = True, True, True
@@ -811,8 +811,8 @@ class S2tDataloader(AudioDataloader):
 
 class BeitDataloader(VisionDataloader):
 
-    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, gpu_id, shuffle=False, model_for_dataloader=None):
-        super(BeitDataloader, self).__init__(args, dataset_path, batch_size, proc_id, proc_num, gpu_id, shuffle, model_for_dataloader)
+    def __init__(self, args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle=False, model_for_dataloader=None):
+        super(BeitDataloader, self).__init__(args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle, model_for_dataloader)
         from tencentpretrain.utils.image_tokenizer import build_vqgan_model
         self.vqgan = self.model_for_dataloader
 
@@ -875,8 +875,8 @@ class BeitDataloader(VisionDataloader):
 
 class DalleDataloader(VisionDataloader):
 
-    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, gpu_id, shuffle=False, model_for_dataloader=None):
-        super(DalleDataloader, self).__init__(args, dataset_path, batch_size, proc_id, proc_num, gpu_id, shuffle, model_for_dataloader)
+    def __init__(self, args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle=False, model_for_dataloader=None):
+        super(DalleDataloader, self).__init__(args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle, model_for_dataloader)
         from tencentpretrain.utils.image_tokenizer import build_vqgan_model
         self.vqgan = self.model_for_dataloader
         self.vocab_bias = args.tokenizer.vocab_bias

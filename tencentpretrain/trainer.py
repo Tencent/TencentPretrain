@@ -618,9 +618,8 @@ def worker(proc_id, gpu_ranks, args, model_for_training, model_for_dataloader=No
 
     if args.dist_train:
         if model_for_dataloader is not None:
-            train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, rank, args.world_size, gpu_id, True, model_for_dataloader.module)
-        else:
-            train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, rank, args.world_size, gpu_id, True, model_for_dataloader)
+            model_for_dataloader = model_for_dataloader.module
+        train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, rank, args.world_size, gpu_id, True, model_for_dataloader)
     else:
         train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, 0, 1, gpu_id, True, model_for_dataloader)
 
