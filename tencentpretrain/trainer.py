@@ -610,7 +610,8 @@ def worker(proc_id, gpu_ranks, args, model_for_training, model_for_dataloader=No
                                     world_size=args.world_size,
                                     rank=rank)
             model_for_training = DistributedDataParallel(model_for_training, device_ids=[gpu_id], find_unused_parameters=True)
-            model_for_dataloader = DistributedDataParallel(model_for_dataloader, device_ids=[gpu_id], find_unused_parameters=False)
+            if model_for_dataloader is not None:
+                model_for_dataloader = DistributedDataParallel(model_for_dataloader, device_ids=[gpu_id], find_unused_parameters=False)
             args.logger.info("Worker %d is training ... " % rank)
         else:
             args.logger.info("Worker is training ...")
