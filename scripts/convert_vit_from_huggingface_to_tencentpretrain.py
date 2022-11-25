@@ -57,7 +57,7 @@ def main():
     output_model["embedding.patch.cls_emb"] = input_model["embeddings.cls_token"]
     output_model["embedding.patch.projection.weight"] = input_model["embeddings.patch_embeddings.projection.weight"]
     output_model["embedding.patch.projection.bias"] = input_model["embeddings.patch_embeddings.projection.bias"]
-    output_model["embedding.pos.position_embedding.weight"] = input_model["embeddings.position_embeddings"].squeeze(0)
+    output_model["embedding.pos.embedding.weight"] = input_model["embeddings.position_embeddings"].squeeze(0)
 
     convert_vit_transformer_encoder_from_huggingface_to_tencentpretrain(input_model, output_model, args.layers_num)
 
