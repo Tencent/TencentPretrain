@@ -34,17 +34,6 @@ class Transpose_module(nn.Module):
         return x.transpose(-2, -1)
 
 
-class GradMultiply(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, x, scale):
-        ctx.scale = scale
-        res = x.new(x)
-        return res
-    @staticmethod
-    def backward(ctx, grad):
-        return grad * ctx.scale, None
-
-
 class Conv1dModule(nn.Module):
     """
     Convolutional subsampler: a stack of 1D convolution (along temporal dimension) followed by non-linear activation
