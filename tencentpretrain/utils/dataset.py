@@ -944,6 +944,7 @@ class FileDataset(Dataset):
 
         dataset_writer.close()
 
+
 class VitDataset(FileWithLabelDataset):
     pass
 
