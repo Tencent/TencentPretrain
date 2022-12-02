@@ -90,7 +90,8 @@ if __name__ == '__main__':
     args = load_hyperparam(args)
 
     args.tokenizer = str2tokenizer[args.tokenizer](args)
-    args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    args.device = torch.device("cpu")
 
     def preprocess_vqgan(x):
         x = 2.*x - 1.
