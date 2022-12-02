@@ -25,7 +25,7 @@ from tencentpretrain.utils.config import load_hyperparam
 from tencentpretrain.model_loader import load_model
 from tencentpretrain.opts import infer_opts, tokenizer_opts
 from scripts.generate_lm import top_k_top_p_filtering
-from tencentpretrain.utils.image_tokenizer import build_vqgan_model
+from tencentpretrain.utils.image_tokenizer import *
 
 class GenerateLm(torch.nn.Module):
     def __init__(self, args):
@@ -96,8 +96,6 @@ if __name__ == '__main__':
         transforms.Lambda(lambda x: preprocess_vqgan(x)),
     ])
 
-
-
     vqgan = build_vqgan_model(args)
     vqgan = vqgan.to(args.device)
 
@@ -105,10 +103,6 @@ if __name__ == '__main__':
     model = load_model(model, args.load_model_path)
 
     model = model.to(args.device)
-
-    if torch.cuda.device_count() > 1:
-        print("{} GPUs are available. Let's use them.".format(torch.cuda.device_count()))
-        model = torch.nn.DataParallel(model)
 
     model.eval()
     caption = "1"
@@ -138,14 +132,8 @@ if __name__ == '__main__':
     else:
         # to attributes and to caption
         image = Image.open(args.image_prefix_path)
-        image = transform(image)
-        images = torch.stack([image], 0).to(args.device)
-        with torch.no_grad():
-            _, _, [_, _, indices] = vqgan.encode(images)
-            if args.is_gumbel:
-                image_token = rearrange(indices, 'b h w -> b (h w)', b = 1).flatten().tolist()
-            else:
-                image_token = rearrange(indices, '(b n) -> b n', b = 1).flatten().tolist()
+        image = transform(image).to(args.device)
+        image_token = image_tokenize(vqgan, image)
 
         p_src =  args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(prompt) + [SEP_TOKEN])
         src = p_src + [i + len(args.tokenizer.vocab) for i in image_token] + [SEP_ID]
@@ -193,16 +181,4 @@ if __name__ == '__main__':
         img_seg = [i - args.text_vocab_size for i in image_id[: img_length]]
         print(len(img_seg), img_seg)
 
-        with torch.no_grad():
-            b, n = 1, len(img_seg)
-            one_hot_indices = F.one_hot(torch.tensor([img_seg]), num_classes = args.vae_vocab).float().to(args.device)
-            z = one_hot_indices @ vqgan.quantize.embed.weight if args.is_gumbel \
-                else (one_hot_indices @ vqgan.quantize.embedding.weight)
-            #z = one_hot_indices @ vae.quantize.embed.weight
-            z = rearrange(z, 'b (h w) c -> b c h w', h = int(sqrt(n))).to(args.device)
-            img = vqgan.decode(z)
-            img = (img.clamp(-1., 1.) + 1) * 0.5
-
-        from torchvision.utils import make_grid, save_image
-        save_image(img, 'output-'+str(r)+'.jpg', normalize=True)
-
+        image_detokenize(vqgan, img_seg, args.image_tokenizer['image_vocab_size'], False, 'output.jpg')
