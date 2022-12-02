@@ -50,8 +50,6 @@ if __name__ == '__main__':
 
     infer_opts(parser)
 
-    parser.add_argument("--has_lmtarget_bias", action="store_true",
-                        help="Add bias on output_layer for lm target.")
     parser.add_argument("--tie_weights", action="store_true",
                         help="Tie the word embedding and softmax weights.")
     parser.add_argument("--prompt", choices=["to_attributes", "to_caption", "to_image"], default="to_attributes",
