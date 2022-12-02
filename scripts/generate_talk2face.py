@@ -158,7 +158,7 @@ if __name__ == '__main__':
         image_token = image_tokenize(vqgan, image)
 
         p_src =  args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(prompt) + [SEP_TOKEN])
-        src = p_src + [i + len(args.tokenizer.vocab) for i in image_token] + [SEP_ID]
+        src = p_src + [i + args.tokenizer.vocab_bias for i in image_token] + [SEP_ID]
         seg = [1] * len(src)
 
         if args.text_prefix is not None:
@@ -200,7 +200,7 @@ if __name__ == '__main__':
         image_id = [token_id.item() for token_id in src_tensor[0][beginning_length:]]
         img_length = (args.image_height // args.vqgan_frame) ** 2
         #print(" ".join([args.tokenizer.inv_vocab[token_id.item()] for token_id in output[1:]]))
-        img_seg = [i - args.text_vocab_size for i in image_id[: img_length]]
+        img_seg = [i - args.tokenizer.vocab_bias for i in image_id[: img_length]]
         print(len(img_seg), img_seg)
 
         image_detokenize(vqgan, img_seg, args.image_tokenizer['image_vocab_size'], False, 'output.jpg')
