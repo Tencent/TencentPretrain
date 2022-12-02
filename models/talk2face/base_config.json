@@ -16,7 +16,7 @@
   "image_width": 256,
   "patch_size": 16,
   "seq_length": 334,
-  "tokenizer": "multimodal",
+  "tokenizer": "text_image",
   "image_tokenizer": {
     "is_gumbel": false,
     "is_transformer": true,
