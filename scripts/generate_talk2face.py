@@ -50,8 +50,6 @@ if __name__ == '__main__':
 
     infer_opts(parser)
 
-    parser.add_argument("--tie_weights", action="store_true",
-                        help="Tie the word embedding and softmax weights.")
     parser.add_argument("--prompt", choices=["to_attributes", "to_caption", "to_image"], default="to_attributes",
                         help="Prompt that indicates the output format.")
     parser.add_argument("--text_prefix",  type=str, default=None,
