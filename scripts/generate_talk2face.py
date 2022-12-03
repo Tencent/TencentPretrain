@@ -90,8 +90,8 @@ if __name__ == '__main__':
     args = load_hyperparam(args)
 
     args.tokenizer = str2tokenizer[args.tokenizer](args)
-    #args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    args.device = torch.device("cpu")
+    args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #args.device = torch.device("cpu")
 
     def preprocess_vqgan(x):
         x = 2.*x - 1.
@@ -187,7 +187,7 @@ if __name__ == '__main__':
         seg_tensor = torch.cat([seg_tensor, torch.tensor([[2]], device=args.device)], dim=1)
 
     #print(src_tensor,seg_tensor)
-    if image_path is not None:
+    if args.image_prefix_path is not None:
         text_id = [str(token_id.item()) for token_id in src_tensor[0][beginning_length:]]
         text_id = " ".join(text_id)
         #print(text_id)
@@ -198,7 +198,7 @@ if __name__ == '__main__':
         print(generated_sentence)
     else:
         image_id = [token_id.item() for token_id in src_tensor[0][beginning_length:]]
-        img_length = (args.image_height // args.vqgan_frame) ** 2
+        img_length = (args.image_height // args.image_tokenizer['frame_size']) ** 2
         #print(" ".join([args.tokenizer.inv_vocab[token_id.item()] for token_id in output[1:]]))
         img_seg = [i - args.tokenizer.vocab_bias for i in image_id[: img_length]]
         print(len(img_seg), img_seg)
