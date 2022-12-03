@@ -73,7 +73,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--prompt", choices=["to_attributes", "to_caption", "to_image"], default="to_attributes",
                         help="Prompt that indicates the output format.")
-    parser.add_argument("--text_prefix",  type=str, default=None,
+    parser.add_argument("--text_prefix_path",  type=str, default=None,
                         help="Text prefix for to_attributes and to_image.")
     parser.add_argument("--image_prefix_path",  type=str, default=None,
                         help="Input image path.")
@@ -92,6 +92,11 @@ if __name__ == '__main__':
     args.tokenizer = str2tokenizer[args.tokenizer](args)
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #args.device = torch.device("cpu")
+
+    args.text_prefix = None
+    if args.text_prefix_path is not None:
+        with open(args.text_prefix_path, 'r') as f:
+            args.text_prefix = f.readline()
 
     def preprocess_vqgan(x):
         x = 2.*x - 1.
