@@ -118,9 +118,6 @@ if __name__ == '__main__':
         transforms.Lambda(lambda x: preprocess_vqgan(x)),
     ])
 
-    vqgan = build_vqgan_model(args)
-    vqgan = vqgan.to(args.device)
-
     model = GenerateLm(args)
     model = load_model(model, args.load_model_path)
 
@@ -129,6 +126,9 @@ if __name__ == '__main__':
     model.eval()
     caption = "1"
     image_path = None
+
+    vqgan = build_vqgan_model(args)
+    vqgan = vqgan.to(args.device)
 
     # This person has no smile, and no eyeglasses. She is in her thirties and has no bangs.
     # This guy doesn't have any beard and has no fringe, and no glasses. He is in his middle age and has no smile.
