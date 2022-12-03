@@ -6,6 +6,7 @@
   "heads_num": 12,
   "layers_num": 12,
   "dropout": 0.1,
+  "max_seq_length": 1024,
   "embedding": ["word", "pos", "seg"],
   "remove_embedding_layernorm": true,
   "layernorm_positioning": "pre",
