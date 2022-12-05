@@ -23,7 +23,7 @@ from tencentpretrain.utils.constants import *
 from tencentpretrain.utils import *
 from tencentpretrain.utils.config import load_hyperparam
 from tencentpretrain.model_loader import load_model
-from tencentpretrain.opts import infer_opts, tokenizer_opts
+from tencentpretrain.opts import model_opts, tokenizer_opts
 from scripts.generate_lm import top_k_top_p_filtering
 from tencentpretrain.utils.image_tokenizer import *
 
