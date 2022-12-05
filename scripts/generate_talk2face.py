@@ -48,10 +48,19 @@ class GenerateLm(torch.nn.Module):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
+
+
+    # Model options.
+    model_opts(parser)
+
+    # Inference options.
     parser.add_argument("--load_model_path", default=None, type=str,
                         help="Path of the input model.")
     parser.add_argument("--config_path", type=str, required=True,
-                        help="Path of the config file.")
+                    help="Path of the config file.")
+    parser.add_argument("--seq_length", type=int, default=48,
+                        help="Sequence length.")
+
     parser.add_argument("--samples_num", type=int, default=10,
                         help="Number of iterations for sampling.")
     parser.add_argument("--prompt", choices=["to_attributes", "to_caption", "to_image"], default="to_attributes",
