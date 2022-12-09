@@ -16,5 +16,5 @@
   "target": ["cls"],
   "image_height": 224,
   "image_width": 224,
-  "patch_size": 16
+  "patch_size": 32
 }
