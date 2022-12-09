@@ -1,0 +1,20 @@
+{
+  "emb_size": 768,
+  "feedforward_size": 3072,
+  "hidden_size": 768,
+  "hidden_act": "gelu",
+  "heads_num": 12,
+  "layers_num": 12,
+  "dropout": 0.1,
+  "max_seq_length": 50,
+  "data_processor": "vit",
+  "embedding": ["patch", "pos"],
+  "remove_embedding_layernorm": true,
+  "encoder": "transformer",
+  "mask": "fully_visible",
+  "layernorm_positioning": "pre",
+  "target": ["cls"],
+  "image_height": 224,
+  "image_width": 224,
+  "patch_size": 32
+}
