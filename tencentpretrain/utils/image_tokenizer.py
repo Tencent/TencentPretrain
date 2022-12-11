@@ -7,7 +7,7 @@ from taming.models.vqgan import VQModel, GumbelVQ
 from taming.models.cond_transformer import Net2NetTransformer
 from PIL import Image
 from torchvision.utils import make_grid, save_image
-
+from math import sqrt, log
 #https://github.com/lucidrains/DALLE-pytorch/blob/main/dalle_pytorch/vae.py#L160
 
 def load_vqgan(config, ckpt_path=None, is_gumbel=False, is_transformer=False):
