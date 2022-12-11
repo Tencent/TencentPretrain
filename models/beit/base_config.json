@@ -18,8 +18,8 @@
   "tokenizer": "vqgan",
   "image_tokenizer": {
     "is_gumbel": false,
-    "is_transformer": true,
-    "image_vocab_size": 1024,
+    "is_transformer": false,
+    "image_vocab_size": 16384,
     "frame_size": 16
   }
 }
