@@ -18,18 +18,10 @@ class LmTarget(nn.Module):
         else:
             self.label_smoothing = None
         if "ignore_index" in args and args.ignore_index:
-            if '<pad>' in args.tokenizer.vocab:
-                self.ignore_index = args.tokenizer.vocab['<pad>']
-            else:
-                self.ignore_index = self.tokenizer.vocab.get(PAD_TOKEN)
+            self.ignore_index = self.tokenizer.vocab.get(PAD_TOKEN)
         else:
             self.ignore_index = None
-        if "reduce" in args:
-            self.reduce = args.reduce
-        else:
-            self.reduce = None
         self.output_layer = nn.Linear(self.hidden_size, self.vocab_size, bias=args.has_lmtarget_bias)
-
         self.softmax = nn.LogSoftmax(dim=-1)
         self.criterion = nn.NLLLoss()
 
@@ -61,12 +53,8 @@ class LmTarget(nn.Module):
             else:
                 nll_loss = nll_loss.squeeze(-1)
                 smooth_loss = smooth_loss.squeeze(-1)
-            if self.reduce:
-                nll_loss = nll_loss.sum()
-                smooth_loss = smooth_loss.sum()
-            else:
-                nll_loss = nll_loss.mean()
-                smooth_loss = smooth_loss.mean()
+            nll_loss = nll_loss.mean()
+            smooth_loss = smooth_loss.mean()
             eps_i = self.label_smoothing / (output.size(-1) - 1)
             loss = (1.0 - self.label_smoothing - eps_i) * nll_loss + eps_i * smooth_loss
 

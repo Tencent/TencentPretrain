@@ -56,7 +56,7 @@ class Text2text(torch.nn.Module):
         tgt_in, tgt_out, _ = tgt
         memory_bank = self.encode(src, seg)
         if tgt_out is None:
-            output = self.decode(src, memory_bank, tgt, None)
+            output = self.decode(src, memory_bank, tgt)
             return None, output
         else:
             decoder_emb = self.tgt_embedding(tgt_in, tgt_seg)

@@ -34,6 +34,5 @@
     "time_wrap_W": 0
    },
    "label_smoothing": 0.1,
-   "ignore_index": true,
-   "reduce": false
+   "ignore_index": true
 }

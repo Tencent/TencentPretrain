@@ -30,11 +30,11 @@ class SinusoidalposEmbedding(nn.Module):
         half_mat = torch.arange(self.max_seq_length, dtype=torch.float).unsqueeze(
             1
         ) * half_exp.unsqueeze(0)
-        if not self.cross:
+        if not self.cross: #Same as the implementation of huggingface/transformers, tensor2tensor
             self.emb = torch.cat([torch.sin(half_mat), torch.cos(half_mat)], dim=1).view(
                 self.max_seq_length, -1
             )
-        else:
+        else: #Implementation based on "Attention Is All You Need"
             self.emb = torch.zeros(self.max_seq_length, args.emb_size)
             self.emb[:, 0::2] = torch.sin(half_mat)
             self.emb[:, 1::2] = torch.cos(half_mat)
