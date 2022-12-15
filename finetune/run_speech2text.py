@@ -1,5 +1,5 @@
 """
-This script provides an example to wrap TencentPretrain for text-to-text fine-tuning.
+This script provides an example to wrap TencentPretrain for speech-to-text fine-tuning.
 """
 import sys
 import os
@@ -31,23 +31,14 @@ class Speech2text(torch.nn.Module):
         for embedding_name in args.tgt_embedding:
             tmp_emb = str2embedding[embedding_name](args, len(args.tokenizer.vocab))
             self.tgt_embedding.update(tmp_emb, embedding_name)
-
         self.decoder = str2decoder[args.decoder](args)
         self.target = Target()
         for target_name in args.target:
-            if args.data_processor == "mt":
-                tmp_target = str2target[target_name](args, len(args.tgt_tokenizer.vocab))
-            else:
-                tmp_target = str2target[target_name](args, len(args.tokenizer.vocab))
+            tmp_target = str2target[target_name](args, len(args.tokenizer.vocab))
             self.target.update(tmp_target, target_name)
-
-        if args.tie_weights and "word" in self.embedding.embedding_name_list:
-            self.target.lm.output_layer.weight = self.embedding.word.embedding.weight
-        elif args.tie_weights and "word" in self.tgt_embedding.embedding_name_list:
+        if args.tie_weights:
             self.target.lm.output_layer.weight = self.tgt_embedding.word.embedding.weight
-        if args.share_embedding:
-            self.tgt_embedding.word.embedding.weight = self.embedding.word.embedding.weight
-    
+
     def encode(self, src, seg):
         emb = self.embedding(src, seg)
         memory_bank = self.encoder(emb, seg)
@@ -56,7 +47,7 @@ class Speech2text(torch.nn.Module):
     def decode(self, emb, memory_bank, tgt, tgt_seg):
         tgt_in, tgt_out, _ = tgt
         decoder_emb = self.tgt_embedding(tgt_in, tgt_seg)
-        hidden = self.decoder(memory_bank, decoder_emb, [emb.abs()[:,:,0]]) #(src.abs()[:,:,0],))
+        hidden = self.decoder(memory_bank, decoder_emb, [emb.abs()[:,:,0]])
         output = self.target.lm.output_layer(hidden)
         return output
 
@@ -64,7 +55,8 @@ class Speech2text(torch.nn.Module):
         if only_use_encoder:
             return self.encode(src, seg)
         if memory_bank is not None:
-            return self.decode(src, memory_bank, tgt, tgt_seg)
+            emb = src
+            return self.decode(emb, memory_bank, tgt, tgt_seg)
         tgt_in, tgt_out, _ = tgt
         memory_bank, emb = self.encode(src, seg)
         
@@ -79,12 +71,12 @@ class Speech2text(torch.nn.Module):
 
 
 def read_dataset(args, path):
-    dataset = []
+    dataset, columns = [], {}
     padding_vector = torch.FloatTensor(args.audio_feature_size * [0.0] if args.audio_feature_size > 1 else 0.0).unsqueeze(0)
+
     def utterance_cmvn( x, normalize_means=True, normalize_vars=True):
         mean = x.mean(axis=0)
         square_sums = (x ** 2).sum(axis=0)
-
         if normalize_means:
             x = torch.sub(x, mean)
         if normalize_vars:
@@ -95,17 +87,22 @@ def read_dataset(args, path):
 
     with open(path, mode="r", encoding="utf-8") as f:
         for line_id, line in enumerate(f):
-            text, wav_path = line.rstrip("\r\n").split("\t")
-            tgt_text = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN]) + \
+            if line_id == 0:
+                for i, column_name in enumerate(line.rstrip("\r\n").split("\t")):
+                    columns[column_name] = i
+                continue
+            line = line.rstrip("\r\n").split("\t")
+            text, wav_path = text, label = line[columns["text"]], line[columns["wav_path"]]
+            tgt = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN]) + \
                 args.tokenizer.convert_tokens_to_ids(args.tokenizer.tokenize(text)) + \
                 args.tokenizer.convert_tokens_to_ids([SEP_TOKEN])
 
-            if len(tgt_text) > args.seq_length:
-                tgt_text = tgt_text[: args.seq_length]
+            if len(tgt) > args.seq_length:
+                tgt = tgt[: args.seq_length]
 
             PAD_ID = args.tokenizer.convert_tokens_to_ids([PAD_TOKEN])
-            pad_num = args.seq_length - len(tgt_text)
-            tgt_text = tgt_text + PAD_ID * pad_num
+            pad_num = args.seq_length - len(tgt)
+            tgt = tgt + PAD_ID * pad_num
 
             waveform, sample_rate = torchaudio.load(wav_path)
             waveform = waveform * (2 ** 15)  # Kaldi compliance: 16-bit signed integers
@@ -120,9 +117,9 @@ def read_dataset(args, path):
                 src_audio = torch.cat([feature] + [padding_vector] * difference)
                 seg_audio = [1] * int(feature.size(0) / args.conv_layers_num / 2) + [0] * (int(args.max_audio_frames /args.conv_layers_num / 2) - int(feature.size(0) / args.conv_layers_num / 2))
 
-            tgt_in = tgt_text[:-1]
-            tgt_out = tgt_text[1:]
-            tgt_seg = [1] * (len(tgt_text[1:]) - pad_num) + [0] * pad_num
+            tgt_in = tgt[:-1]
+            tgt_out = tgt[1:]
+            tgt_seg = [1] * (len(tgt[1:]) - pad_num) + [0] * pad_num
 
             dataset.append((src_audio, tgt_in, tgt_out, seg_audio, tgt_seg))
 
@@ -208,28 +205,21 @@ def evaluate(args, dataset):
             tgt_in_batch = torch.cat([tgt_in_batch, next_tokens], dim=1)
             tgt_seg_batch  = torch.ones(tgt_in_batch.size()[0], tgt_in_batch.size()[1], dtype=torch.long, device=args.device)
         for j in range(len(outputs)):
-            sentence = " ".join([args.tokenizer.inv_vocab[token_id.item()] for token_id in tgt_in_batch[j][1:]])
+            sentence = "".join([args.tokenizer.inv_vocab[token_id.item()] for token_id in tgt_in_batch[j][1:]])
             generated_sentences.append(sentence)
 
-    labels = {}
-    labels_num = 0
-    for example in dataset:
-        label = "".join([args.tokenizer.inv_vocab[token_id] for token_id in example[2][:-2]]).split(SEP_TOKEN)[0]
-        if not labels.get(label, None):
-            labels[label] = labels_num
-            labels_num += 1
     w_errs = 0
     w_total = 0
 
     for i, example in enumerate(dataset):
         tgt = example[2]
-        tgt_token = " ".join([args.tokenizer.inv_vocab[token_id] for token_id in tgt[:-2]])
+        tgt_token = "".join([args.tokenizer.inv_vocab[token_id] for token_id in tgt[:-2]])
         generated_sentences[i] = generated_sentences[i].split(SEP_TOKEN)[0]
 
-        pred = "".join(generated_sentences[i].split(" ")).split("▁")
-        gold = "".join(tgt_token.split(SEP_TOKEN)[0].split(" ")).split("▁")
+        pred = generated_sentences[i].split("▁")
+        gold = tgt_token.split(SEP_TOKEN)[0].split("▁")
         w_errs += editdistance.eval(pred, gold)
-        w_total +=  len(gold)
+        w_total += len(gold)
 
     args.logger.info("WER. (Word_Errors/Total): {:.4f} ({}/{}) ".format(w_errs / w_total, w_errs, w_total))
     return w_errs / w_total

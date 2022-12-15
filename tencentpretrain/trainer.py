@@ -100,7 +100,7 @@ class Trainer(object):
                         batch[i] = batch[i].cuda(gpu_id)
 
             loss = self.forward_propagation(batch, model)
-            
+
             if args.deepspeed:
                 model.backward(loss)
             else:

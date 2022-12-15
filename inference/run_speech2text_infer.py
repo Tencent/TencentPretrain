@@ -30,7 +30,7 @@ def main():
 
     parser.add_argument("--beam_width", type=int, default=10,
                         help="Beam width.")
-    parser.add_argument("--max_step", type=int, default=100,
+    parser.add_argument("--tgt_seq_length", type=int, default=100,
                         help="inference step.")
     args = parser.parse_args()
 
@@ -54,15 +54,12 @@ def main():
     dataset = read_dataset(args, args.test_path)
 
     src_audio = torch.stack([sample[0] for sample in dataset], dim=0)
-    # tgt_in = torch.LongTensor([sample[1] for sample in dataset])
-    # tgt_out = torch.LongTensor([sample[2] for sample in dataset])
     seg_audio = torch.LongTensor([sample[3] for sample in dataset])
-    # tgt_seg = torch.LongTensor([sample[4] for sample in dataset])
 
     batch_size = args.batch_size
     beam_width=args.beam_width
     instances_num = src_audio.size()[0]
-    max_step = args.max_step
+    tgt_seq_length = args.tgt_seq_length
 
     PAD_ID = args.tokenizer.convert_tokens_to_ids([PAD_TOKEN])
     SEP_ID = args.tokenizer.convert_tokens_to_ids([SEP_TOKEN])
@@ -88,13 +85,13 @@ def main():
                 memory_bank, emb = model(src_batch, None, seg_batch, None, only_use_encoder=True)
 
             step = 0
-            scores = torch.zeros(current_batch_size, beam_width, max_step)
-            tokens = torch.zeros(current_batch_size, beam_width, max_step+1, dtype = torch.long)
+            scores = torch.zeros(current_batch_size, beam_width, tgt_seq_length)
+            tokens = torch.zeros(current_batch_size, beam_width, tgt_seq_length+1, dtype = torch.long)
             tokens[:,:,0] = torch.LongTensor(args.tokenizer.convert_tokens_to_ids([SEP_TOKEN])) #2
             emb = emb.repeat(1, beam_width, 1).reshape(current_batch_size * beam_width, -1, int(args.conv_channels[-1] / 2)) #same batch nearby
             memory_bank = memory_bank.repeat(1, beam_width, 1).reshape(current_batch_size * beam_width, -1, args.emb_size) 
             tgt_in_batch = tgt_in_batch.repeat(beam_width, 1)
-            while step < max_step and step < seq_length:
+            while step < tgt_seq_length and step < seq_length:
                 with torch.no_grad():
                     outputs = model(emb, (tgt_in_batch, None, None), None, None, memory_bank=memory_bank)
 
@@ -135,7 +132,6 @@ def main():
                     res = res.split(SEP_TOKEN)[1].split(CLS_TOKEN)[0] # res.split(CLS_TOKEN)[1].split(SEP_TOKEN)[0] for tencentpretrain model
                     res = res.replace('▁',' ')
 
-                    print(res)
                     f.write(res)
                     f.write("\n")
 

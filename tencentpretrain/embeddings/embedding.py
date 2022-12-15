@@ -30,6 +30,5 @@ class Embedding(nn.Module):
 
         if not self.remove_embedding_layernorm:
             emb = self.layer_norm(emb)
-        if isinstance(emb, torch.Tensor):
-            emb = self.dropout(emb)
+        emb = self.dropout(emb)
         return emb

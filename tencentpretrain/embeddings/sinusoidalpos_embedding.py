@@ -19,10 +19,10 @@ class SinusoidalposEmbedding(nn.Module):
 
         if "speech" in args.embedding:
             self.max_seq_length = max(args.max_seq_length, args.max_audio_frames)
-            self.cross = False
+            self.arrange_sincos_cross = False
         else:
             self.max_seq_length = args.max_seq_length
-            self.cross = True
+            self.arrange_sincos_cross = True
         self.emb_size = args.emb_size
         half_dim = self.emb_size // 2   
         value = math.log(10000) / (half_dim - 1)
@@ -30,7 +30,7 @@ class SinusoidalposEmbedding(nn.Module):
         half_mat = torch.arange(self.max_seq_length, dtype=torch.float).unsqueeze(
             1
         ) * half_exp.unsqueeze(0)
-        if not self.cross: #Same as the implementation of huggingface/transformers, tensor2tensor
+        if not self.arrange_sincos_cross: #Same as the implementation of huggingface/transformers, tensor2tensor
             self.emb = torch.cat([torch.sin(half_mat), torch.cos(half_mat)], dim=1).view(
                 self.max_seq_length, -1
             )
