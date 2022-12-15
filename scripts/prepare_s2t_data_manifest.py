@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
-# Copyright (c) Facebook, Inc. and its affiliates.
-#
-# This source code is licensed under the MIT license found in the
-# LICENSE file in the root directory of this source tree.
 
 """
-Helper script to pre-compute embeddings for a flashlight (previously called wav2letter++) dataset
+Helper script to generate speech2text dataset
 """
 
 import argparse
@@ -18,6 +14,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("root")
     parser.add_argument("--output-file", required=True)
+    parser.add_argument("--for_finetune", action='store_true')
     parser.add_argument("--sample-ratio", type=float, default=1.0)
     parser.add_argument("--ext", default="flac")
     parser.add_argument("--seed", type=int, default=7)
@@ -32,6 +29,8 @@ def main():
     transcriptions = {}
 
     with open(args.output_file, "w") as out_file:
+        if args.for_finetune:
+            print("text" + "\t" + "wav_path", file=out_file)
         for fname in glob.iglob(search_path, recursive=True):
             if rand.random() > args.sample_ratio:
                 continue
