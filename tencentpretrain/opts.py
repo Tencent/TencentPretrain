@@ -91,6 +91,8 @@ def optimization_opts(parser):
                         help="Learning rate.")
     parser.add_argument("--warmup", type=float, default=0.1,
                         help="Warm up value.")
+    parser.add_argument("--decay", type=float, default=0.5,
+                        help="decay value.")
     parser.add_argument("--fp16", action='store_true',
                         help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit.")
     parser.add_argument("--fp16_opt_level", choices=["O0", "O1", "O2", "O3" ], default='O1',
@@ -100,7 +102,7 @@ def optimization_opts(parser):
                         default="adamw",
                         help="Optimizer type.")
     parser.add_argument("--scheduler", choices=["linear", "cosine", "cosine_with_restarts", "polynomial",
-                                                "constant", "constant_with_warmup"],
+                                                "constant", "constant_with_warmup", "inverse_sqrt", "tri_stage"],
                         default="linear", help="Scheduler type.")
 
 

@@ -52,7 +52,7 @@ TencentPretrain has the following features:
 * For the use of CRF in sequence labeling downstream task you will need [pytorch-crf](https://github.com/kmkurn/pytorch-crf)
 * For the gigantic model training you will need [DeepSpeed](https://github.com/microsoft/DeepSpeed)
 * For the vision model training you will need torchvision
-* For the audio model training you will need torchaudio
+* For the audio model training you will need torchaudio, and opencv-python is needed for some special settings of specaugment
 
 
 <br/>

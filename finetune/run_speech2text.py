@@ -1,11 +1,14 @@
 """
-This script provides an example to wrap TencentPretrain for text-to-text fine-tuning.
+This script provides an example to wrap TencentPretrain for speech-to-text fine-tuning.
 """
 import sys
 import os
 import random
 import argparse
+import editdistance
 import torch
+import torchaudio
+import torchaudio.compliance.kaldi as ta_kaldi
 
 tencentpretrain_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(tencentpretrain_dir)
@@ -16,9 +19,9 @@ from tencentpretrain.targets import *
 from finetune.run_classifier import *
 
 
-class Text2text(torch.nn.Module):
+class Speech2text(torch.nn.Module):
     def __init__(self, args):
-        super(Text2text, self).__init__()
+        super(Speech2text, self).__init__()
         self.embedding = Embedding(args)
         for embedding_name in args.embedding:
             tmp_emb = str2embedding[embedding_name](args, len(args.tokenizer.vocab))
@@ -30,21 +33,21 @@ class Text2text(torch.nn.Module):
             self.tgt_embedding.update(tmp_emb, embedding_name)
         self.decoder = str2decoder[args.decoder](args)
         self.target = Target()
-        self.target.update(LmTarget(args, len(args.tokenizer.vocab)), "lm")
+        for target_name in args.target:
+            tmp_target = str2target[target_name](args, len(args.tokenizer.vocab))
+            self.target.update(tmp_target, target_name)
         if args.tie_weights:
-            self.target.lm.output_layer.weight = self.embedding.word.embedding.weight
-        if args.share_embedding:
-            self.tgt_embedding.word.embedding.weight = self.embedding.word.embedding.weight
+            self.target.lm.output_layer.weight = self.tgt_embedding.word.embedding.weight
 
     def encode(self, src, seg):
         emb = self.embedding(src, seg)
         memory_bank = self.encoder(emb, seg)
-        return memory_bank
+        return memory_bank, emb
 
-    def decode(self, src, memory_bank, tgt, tgt_seg):
+    def decode(self, emb, memory_bank, tgt, tgt_seg):
         tgt_in, tgt_out, _ = tgt
         decoder_emb = self.tgt_embedding(tgt_in, tgt_seg)
-        hidden = self.decoder(memory_bank, decoder_emb, (src,))
+        hidden = self.decoder(memory_bank, decoder_emb, [emb.abs()[:,:,0]])
         output = self.target.lm.output_layer(hidden)
         return output
 
@@ -52,11 +55,13 @@ class Text2text(torch.nn.Module):
         if only_use_encoder:
             return self.encode(src, seg)
         if memory_bank is not None:
-            return self.decode(src, memory_bank, tgt, tgt_seg)
+            emb = src
+            return self.decode(emb, memory_bank, tgt, tgt_seg)
         tgt_in, tgt_out, _ = tgt
-        memory_bank = self.encode(src, seg)
+        memory_bank, emb = self.encode(src, seg)
+        
         if tgt_out is None:
-            output = self.decode(src, memory_bank, tgt)
+            output = self.decode(emb, memory_bank, tgt, None)
             return None, output
         else:
             decoder_emb = self.tgt_embedding(tgt_in, tgt_seg)
@@ -67,6 +72,19 @@ class Text2text(torch.nn.Module):
 
 def read_dataset(args, path):
     dataset, columns = [], {}
+    padding_vector = torch.FloatTensor(args.audio_feature_size * [0.0] if args.audio_feature_size > 1 else 0.0).unsqueeze(0)
+
+    def utterance_cmvn( x, normalize_means=True, normalize_vars=True):
+        mean = x.mean(axis=0)
+        square_sums = (x ** 2).sum(axis=0)
+        if normalize_means:
+            x = torch.sub(x, mean)
+        if normalize_vars:
+            var = square_sums / x.size(0) - mean ** 2
+            std = torch.sqrt(torch.maximum(var, torch.full(var.size() , 1e-10)))
+            x = torch.div(x, std)
+        return x
+
     with open(path, mode="r", encoding="utf-8") as f:
         for line_id, line in enumerate(f):
             if line_id == 0:
@@ -74,36 +92,36 @@ def read_dataset(args, path):
                     columns[column_name] = i
                 continue
             line = line.rstrip("\r\n").split("\t")
+            text, wav_path = text, label = line[columns["text"]], line[columns["wav_path"]]
+            tgt = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN]) + \
+                args.tokenizer.convert_tokens_to_ids(args.tokenizer.tokenize(text)) + \
+                args.tokenizer.convert_tokens_to_ids([SEP_TOKEN])
 
-            if "text_b" in columns:
-                text = line[columns["text_a"]] + SEP_TOKEN + line[columns["text_b"]]
-                label = line[columns["label"]]
+            if len(tgt) > args.seq_length:
+                tgt = tgt[: args.seq_length]
+
+            PAD_ID = args.tokenizer.convert_tokens_to_ids([PAD_TOKEN])
+            pad_num = args.seq_length - len(tgt)
+            tgt = tgt + PAD_ID * pad_num
+
+            waveform, sample_rate = torchaudio.load(wav_path)
+            waveform = waveform * (2 ** 15)  # Kaldi compliance: 16-bit signed integers
+            feature = ta_kaldi.fbank(waveform, num_mel_bins=args.audio_feature_size, sample_frequency=sample_rate)
+            if "ceptral_normalize" in args.audio_preprocess:
+                feature = utterance_cmvn(feature)
+            difference = args.max_audio_frames - feature.size(0)
+
+            if difference < 0:
+                continue
             else:
-                text, label = line[columns["text_a"]], line[columns["label"]]
+                src_audio = torch.cat([feature] + [padding_vector] * difference)
+                seg_audio = [1] * int(feature.size(0) / args.conv_layers_num / 2) + [0] * (int(args.max_audio_frames /args.conv_layers_num / 2) - int(feature.size(0) / args.conv_layers_num / 2))
 
-            src = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(text) + [SEP_TOKEN])
-            tgt_in = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(label) + [SEP_TOKEN])
-            PAD_ID = args.tokenizer.convert_tokens_to_ids([PAD_TOKEN])[0]
-            seg = [1] * len(src)
-            tgt_seg = [1] * len(tgt_in)
+            tgt_in = tgt[:-1]
+            tgt_out = tgt[1:]
+            tgt_seg = [1] * (len(tgt[1:]) - pad_num) + [0] * pad_num
 
-            if len(src) > args.seq_length:
-                src = src[: args.seq_length]
-                seg = seg[: args.seq_length]
-            if len(tgt_in) > args.tgt_seq_length:
-                tgt_in = tgt_in[: args.tgt_seq_length]
-                tgt_seg = tgt_seg[: args.tgt_seq_length]
-            tgt_out = tgt_in[1:] + [PAD_ID]
-
-            while len(src) < args.seq_length:
-                src.append(PAD_ID)
-                seg.append(0)
-            while len(tgt_in) < args.tgt_seq_length:
-                tgt_in.append(PAD_ID)
-                tgt_out.append(PAD_ID)
-                tgt_seg.append(PAD_ID)
-
-            dataset.append((src, tgt_in, tgt_out, seg, tgt_seg))
+            dataset.append((src_audio, tgt_in, tgt_out, seg_audio, tgt_seg))
 
     return dataset
 
@@ -155,7 +173,7 @@ def train_model(args, model, optimizer, scheduler, src_batch, tgt_in_batch, tgt_
 
 def evaluate(args, dataset):
 
-    src = torch.LongTensor([example[0] for example in dataset])
+    src = torch.stack([example[0] for example in dataset], dim=0)
     tgt_in = torch.LongTensor([example[1] for example in dataset])
     tgt_out = torch.LongTensor([example[2] for example in dataset])
     seg = torch.LongTensor([example[3] for example in dataset])
@@ -170,52 +188,41 @@ def evaluate(args, dataset):
         tgt_in_batch = torch.zeros(tgt_in_batch.size()[0], 1, dtype=torch.long, device=args.device)
         tgt_seg_batch  = torch.ones(tgt_in_batch.size()[0], 1, dtype=torch.long, device=args.device)
         for j in range(tgt_in_batch.size()[0]):
-            tgt_in_batch[j][-1] = args.tokenizer.vocab.get(CLS_TOKEN)
+            tgt_in_batch[j][0] = args.tokenizer.vocab.get(CLS_TOKEN)
 
         seg_batch = seg_batch.to(args.device)
 
         with torch.no_grad():
-            memory_bank = args.model(src_batch, None, seg_batch, tgt_seg_batch, only_use_encoder=True)
+            memory_bank, emb = args.model(src_batch, None, seg_batch, tgt_seg_batch, only_use_encoder=True)
 
         for _ in range(args.tgt_seq_length):
             tgt_out_batch = tgt_in_batch
             with torch.no_grad():
-                outputs = args.model(src_batch, (tgt_in_batch, tgt_out_batch, src_batch), None, tgt_seg_batch, memory_bank=memory_bank)
+                outputs = args.model(emb, (tgt_in_batch, tgt_out_batch, src_batch), None, tgt_seg_batch, memory_bank=memory_bank)
 
             next_token_logits = outputs[:, -1]
             next_tokens = torch.argmax(next_token_logits, dim=1).unsqueeze(1)
             tgt_in_batch = torch.cat([tgt_in_batch, next_tokens], dim=1)
             tgt_seg_batch  = torch.ones(tgt_in_batch.size()[0], tgt_in_batch.size()[1], dtype=torch.long, device=args.device)
         for j in range(len(outputs)):
-            sentence = " ".join([args.tokenizer.inv_vocab[token_id.item()] for token_id in tgt_in_batch[j][1:]])
+            sentence = "".join([args.tokenizer.inv_vocab[token_id.item()] for token_id in tgt_in_batch[j][1:]])
             generated_sentences.append(sentence)
 
-    labels = {}
-    labels_num = 0
-    for example in dataset:
-        label = "".join([args.tokenizer.inv_vocab[token_id] for token_id in example[2][:-2]]).split(SEP_TOKEN)[0]
-        if not labels.get(label, None):
-            labels[label] = labels_num
-            labels_num += 1
-    confusion_matrix = torch.zeros(labels_num, labels_num, dtype=torch.long)
-    correct = 0
+    w_errs = 0
+    w_total = 0
 
     for i, example in enumerate(dataset):
         tgt = example[2]
-        tgt_token = " ".join([args.tokenizer.inv_vocab[token_id] for token_id in tgt[:-2]])
+        tgt_token = "".join([args.tokenizer.inv_vocab[token_id] for token_id in tgt[:-2]])
         generated_sentences[i] = generated_sentences[i].split(SEP_TOKEN)[0]
 
-        pred = "".join(generated_sentences[i].split(" "))
-        gold = "".join(tgt_token.split(SEP_TOKEN)[0].split(" "))
+        pred = generated_sentences[i].split("▁")
+        gold = tgt_token.split(SEP_TOKEN)[0].split("▁")
+        w_errs += editdistance.eval(pred, gold)
+        w_total += len(gold)
 
-        if pred in labels.keys():
-            confusion_matrix[labels[pred], labels[gold]] += 1
-
-        if pred == gold:
-            correct += 1
-
-    args.logger.info("Acc. (Correct/Total): {:.4f} ({}/{}) ".format(correct / len(dataset), correct, len(dataset)))
-    return correct / len(dataset)
+    args.logger.info("WER. (Word_Errors/Total): {:.4f} ({}/{}) ".format(w_errs / w_total, w_errs, w_total))
+    return w_errs / w_total
 
 
 def main():
@@ -225,7 +232,7 @@ def main():
 
     tokenizer_opts(parser)
 
-    parser.add_argument("--tgt_seq_length", type=int, default=32,
+    parser.add_argument("--tgt_seq_length", type=int, default=50,
                         help="Output sequence length.")
 
     args = parser.parse_args()
@@ -239,7 +246,7 @@ def main():
     args.tokenizer = str2tokenizer[args.tokenizer](args)
 
     # Build classification model.
-    model = Text2text(args)
+    model = Speech2text(args)
 
     # Load or initialize parameters.
     load_or_initialize_parameters(args, model)
@@ -275,13 +282,13 @@ def main():
         model = torch.nn.DataParallel(model)
     args.model = model
 
-    total_loss, result, best_result = 0.0, 0.0, 0.0
+    total_loss, result, best_result = 0.0, 0.0, 100.0
 
     args.logger.info("Start training.")
 
     for epoch in range(1, args.epochs_num + 1):
         random.shuffle(trainset)
-        src = torch.LongTensor([example[0] for example in trainset])
+        src = torch.stack([example[0] for example in trainset], dim=0)
         tgt_in = torch.LongTensor([example[1] for example in trainset])
         tgt_out = torch.LongTensor([example[2] for example in trainset])
         seg = torch.LongTensor([example[3] for example in trainset])
@@ -296,7 +303,7 @@ def main():
                 total_loss = 0.0
 
         result = evaluate(args, read_dataset(args, args.dev_path))
-        if result > best_result:
+        if result < best_result:
             best_result = result
             save_model(model, args.output_model_path)
 
