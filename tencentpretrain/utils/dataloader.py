@@ -9,13 +9,15 @@ from tencentpretrain.utils.augment import SpecAugment
 
 
 class Dataloader(object):
-    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, shuffle=False):
+    def __init__(self, args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle=False, model_for_dataloader=None):
         self.tokenizer = args.tokenizer
         self.batch_size = batch_size
         self.instances_buffer_size = args.instances_buffer_size
-        self.proc_id = proc_id
-        self.proc_num = proc_num
+        self.rank = rank
+        self.world_size = world_size
+        self.gpu_id = gpu_id
         self.shuffle = shuffle
+        self.model_for_dataloader = model_for_dataloader
         self.dataset_reader = open(dataset_path, "rb")
         self.read_count = 0
         self.start = 0
@@ -33,7 +35,7 @@ class Dataloader(object):
             while True:
                 instance = pickle.load(self.dataset_reader)
                 self.read_count += 1
-                if (self.read_count - 1) % self.proc_num == self.proc_id:
+                if (self.read_count - 1) % self.world_size == self.rank:
                     self.buffer.append(instance)
                     if len(self.buffer) >= self.instances_buffer_size:
                         break
@@ -539,8 +541,8 @@ class ClsMlmDataloader(Dataloader):
 
 
 class VisionDataloader(Dataloader):
-    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, shuffle=False):
-        super(VisionDataloader, self).__init__(args, dataset_path, batch_size, proc_id, proc_num, shuffle)
+    def __init__(self, args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle=False, model_for_dataloader=None):
+        super(VisionDataloader, self).__init__(args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle, model_for_dataloader)
         self.patch_size = args.patch_size
         self.image_height = args.image_height
         self.image_width = args.image_width
@@ -591,7 +593,7 @@ class VitDataloader(VisionDataloader):
             for ins in instances:
 
                 image = read_image(ins[1], ImageReadMode.RGB)
-                image = image.cuda(self.proc_id)
+                image = image.cuda(self.gpu_id)
                 src.append(self.transform(image))
                 tgt.append(ins[0])
                 seg.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
@@ -656,7 +658,7 @@ class ViltDataloader(VisionDataloader):
 
                 seg_image = [2] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1)
                 tgt_mlm[-1].extend([0] * len(seg_image))
-                image = image.cuda(self.proc_id)
+                image = image.cuda(self.gpu_id)
                 src_image_single = self.transform(image)
                 src_image.append(src_image_single)
                 seg.append([1] * ins[1][0] + [0] * pad_num + seg_image)
@@ -710,7 +712,7 @@ class ClipDataloader(VisionDataloader):
                 src_text.append(src_text_single)
                 seg_text.append([1] * ins[1][0] + [0] * pad_num)
                 image = read_image(ins[2], ImageReadMode.RGB)
-                image = image.cuda(self.proc_id)
+                image = image.cuda(self.gpu_id)
                 src_image.append(self.transform(image))
                 seg_image.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
 
@@ -721,8 +723,8 @@ class ClipDataloader(VisionDataloader):
 
 
 class AudioDataloader(Dataloader):
-    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, shuffle=False):
-        super(AudioDataloader, self).__init__(args, dataset_path, batch_size, proc_id, proc_num, shuffle)
+    def __init__(self, args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle=False, model_for_dataloader=None):
+        super(AudioDataloader, self).__init__(args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle, model_for_dataloader)
         self.dataset_folder = os.path.dirname(dataset_path)
         self.sampling_rate = args.sampling_rate
         self.normalize_means, self.normalize_vars, self.ceptral_normalize = True, True, True
@@ -819,10 +821,10 @@ class S2tDataloader(AudioDataloader):
 
 class BeitDataloader(VisionDataloader):
 
-    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, shuffle=False):
-        super(BeitDataloader, self).__init__(args, dataset_path, batch_size, proc_id, proc_num, shuffle)
+    def __init__(self, args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle=False, model_for_dataloader=None):
+        super(BeitDataloader, self).__init__(args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle, model_for_dataloader)
         from tencentpretrain.utils.image_tokenizer import build_vqgan_model
-        self.vqgan = build_vqgan_model(args).cuda(proc_id)
+        self.vqgan = self.model_for_dataloader
 
 
     def mask(self, image_tokens, mask_rate = 0.15):
@@ -866,7 +868,7 @@ class BeitDataloader(VisionDataloader):
             for ins in instances:
 
                 image = read_image(ins, ImageReadMode.RGB)
-                image = image.cuda(self.proc_id)
+                image = image.cuda(self.gpu_id)
                 image = self.transform(image)
                 src.append(image)
                 image_tokens = [0] + image_tokenize(self.vqgan, image)
@@ -883,10 +885,10 @@ class BeitDataloader(VisionDataloader):
 
 class DalleDataloader(VisionDataloader):
 
-    def __init__(self, args, dataset_path, batch_size, proc_id, proc_num, shuffle=False):
-        super(DalleDataloader, self).__init__(args, dataset_path, batch_size, proc_id, proc_num, shuffle)
+    def __init__(self, args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle=False, model_for_dataloader=None):
+        super(DalleDataloader, self).__init__(args, dataset_path, batch_size, rank, world_size, gpu_id, shuffle, model_for_dataloader)
         from tencentpretrain.utils.image_tokenizer import build_vqgan_model
-        self.vqgan = build_vqgan_model(args).cuda(self.proc_id)
+        self.vqgan = self.model_for_dataloader
         self.vocab_bias = args.tokenizer.vocab_bias
 
 
@@ -912,7 +914,7 @@ class DalleDataloader(VisionDataloader):
                 src_single, pad_num = ins[0]
 
                 image = read_image(ins[2], ImageReadMode.RGB)
-                image = image.cuda(self.proc_id)
+                image = image.cuda(self.gpu_id)
                 image = self.transform(image)
                 image_tokens = [i + self.vocab_bias for i in image_tokenize(self.vqgan, image)]
                 src_single.extend(image_tokens)
