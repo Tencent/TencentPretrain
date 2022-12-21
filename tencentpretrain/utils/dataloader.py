@@ -741,18 +741,18 @@ class AudioDataloader(Dataloader):
         if "sepcaugment" in args:
             self.specaugment = SpecAugment(args)
 
-    def utterance_cmvn(self, x, normalize_means, normalize_vars):
-        mean = x.mean(axis=0)
-        square_sums = (x ** 2).sum(axis=0)
+def utterance_cmvn(x, normalize_means=True, normalize_vars=True):
+    mean = x.mean(axis=0)
+    square_sums = (x ** 2).sum(axis=0)
 
-        if normalize_means:
-            x = torch.sub(x, mean)
-        if normalize_vars:
-            var = square_sums / x.size(0) - mean ** 2
-            std = torch.sqrt(torch.maximum(var, torch.full(var.size() , 1e-10)))
-            x = torch.div(x, std)
+    if normalize_means:
+        x = torch.sub(x, mean)
+    if normalize_vars:
+        var = square_sums / x.size(0) - mean ** 2
+        std = torch.sqrt(torch.maximum(var, torch.full(var.size() , 1e-10)))
+        x = torch.div(x, std)
 
-        return x
+    return x
 
 
 class S2tDataloader(AudioDataloader):
@@ -789,7 +789,7 @@ class S2tDataloader(AudioDataloader):
                 feature = ta_kaldi.fbank(waveform, num_mel_bins=self.audio_feature_size,
                                          sample_frequency=self.sampling_rate)
                 if self.ceptral_normalize:
-                    feature = self.utterance_cmvn(feature, self.normalize_means, self.normalize_vars)
+                    feature = utterance_cmvn(feature, self.normalize_means, self.normalize_vars)
                 difference = self.max_audio_frames - feature.size(0)
                 if difference < 0:
                     continue

@@ -66,12 +66,14 @@ class Dataset(object):
         print("Starting %d workers for building datasets ... " % workers_num)
         assert (workers_num >= 1)
         if workers_num == 1:
-            self.worker(0, 0, lines_num)
+            self.worker(0, 1, lines_num)
         else:
             pool = Pool(workers_num)
             for i in range(workers_num):
                 start = i * lines_num // workers_num
                 end = (i + 1) * lines_num // workers_num
+                if start == 0:
+                    start = 1
                 pool.apply_async(func=self.worker, args=[i, start, end])
             pool.close()
             pool.join()

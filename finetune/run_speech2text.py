@@ -16,6 +16,7 @@ sys.path.append(tencentpretrain_dir)
 from tencentpretrain.model_saver import save_model
 from tencentpretrain.decoders import *
 from tencentpretrain.targets import *
+from tencentpretrain.utils import utterance_cmvn
 from finetune.run_classifier import *
 
 
@@ -74,17 +75,6 @@ def read_dataset(args, path):
     dataset, columns = [], {}
     padding_vector = torch.FloatTensor(args.audio_feature_size * [0.0] if args.audio_feature_size > 1 else 0.0).unsqueeze(0)
 
-    def utterance_cmvn( x, normalize_means=True, normalize_vars=True):
-        mean = x.mean(axis=0)
-        square_sums = (x ** 2).sum(axis=0)
-        if normalize_means:
-            x = torch.sub(x, mean)
-        if normalize_vars:
-            var = square_sums / x.size(0) - mean ** 2
-            std = torch.sqrt(torch.maximum(var, torch.full(var.size() , 1e-10)))
-            x = torch.div(x, std)
-        return x
-
     with open(path, mode="r", encoding="utf-8") as f:
         for line_id, line in enumerate(f):
             if line_id == 0:
@@ -92,7 +82,7 @@ def read_dataset(args, path):
                     columns[column_name] = i
                 continue
             line = line.rstrip("\r\n").split("\t")
-            text, wav_path = text, label = line[columns["text"]], line[columns["wav_path"]]
+            text, wav_path = line[columns["text"]], line[columns["wav_path"]]
             tgt = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN]) + \
                 args.tokenizer.convert_tokens_to_ids(args.tokenizer.tokenize(text)) + \
                 args.tokenizer.convert_tokens_to_ids([SEP_TOKEN])
