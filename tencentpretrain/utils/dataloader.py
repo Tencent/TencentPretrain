@@ -782,7 +782,7 @@ class S2tDataloader(AudioDataloader):
             src_audio = []
             seg_audio = []
             tgt_seg = []
-            
+
             for ins in instances:
                 text_single, pad_num = ins[0]
                 for _ in range(pad_num):
