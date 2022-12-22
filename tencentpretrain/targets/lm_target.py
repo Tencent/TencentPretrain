@@ -18,7 +18,7 @@ class LmTarget(nn.Module):
         else:
             self.label_smoothing = None
         if "ignore_index" in args and args.ignore_index:
-            self.ignore_index = self.tokenizer.vocab.get(PAD_TOKEN)
+            self.ignore_index = args.tokenizer.vocab.get(PAD_TOKEN)
         else:
             self.ignore_index = None
         self.output_layer = nn.Linear(self.hidden_size, self.vocab_size, bias=args.has_lmtarget_bias)

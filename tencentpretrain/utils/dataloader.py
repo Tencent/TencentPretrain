@@ -743,18 +743,21 @@ class AudioDataloader(Dataloader):
         if "sepcaugment" in args:
             self.specaugment = SpecAugment(args)
 
-    def utterance_cmvn(self, x, normalize_means, normalize_vars):
-        mean = x.mean(axis=0)
-        square_sums = (x ** 2).sum(axis=0)
+def utterance_cmvn(x, normalize_means=True, normalize_vars=True, gpu_id=None):
+    mean = x.mean(axis=0)
+    square_sums = (x ** 2).sum(axis=0)
 
-        if normalize_means:
-            x = torch.sub(x, mean)
-        if normalize_vars:
-            var = square_sums / x.size(0) - mean ** 2
-            std = torch.sqrt(torch.maximum(var, torch.full(var.size() , 1e-10)))
-            x = torch.div(x, std)
+    if normalize_means:
+        x = torch.sub(x, mean)
+    if normalize_vars:
+        var = square_sums / x.size(0) - mean ** 2
+        if gpu_id is not None:
+            std = torch.sqrt(torch.maximum(var, torch.full(var.size(), 1e-10).cuda(gpu_id)))
+        else:
+            std = torch.sqrt(torch.maximum(var, torch.full(var.size(), 1e-10)))
+        x = torch.div(x, std)
 
-        return x
+    return x
 
 
 class S2tDataloader(AudioDataloader):
@@ -763,8 +766,7 @@ class S2tDataloader(AudioDataloader):
         import torchaudio
         import torchaudio.compliance.kaldi as ta_kaldi
 
-        padding_vector = torch.FloatTensor(self.audio_feature_size * [self.padding_value] if self.audio_feature_size > 1 else self.padding_value).unsqueeze(0)
-
+        padding_vector = torch.FloatTensor(self.audio_feature_size * [self.padding_value] if self.audio_feature_size > 1 else self.padding_value).unsqueeze(0).cuda(self.gpu_id)
         while True:
             while self._empty():
                 self._fill_buf()
@@ -788,10 +790,11 @@ class S2tDataloader(AudioDataloader):
 
                 waveform, _ = torchaudio.load(ins[2])  # waveform, sample_rate
                 waveform = waveform * (2 ** 15)  # Kaldi compliance: 16-bit signed integers
+                waveform = waveform.cuda(self.gpu_id)
                 feature = ta_kaldi.fbank(waveform, num_mel_bins=self.audio_feature_size,
                                          sample_frequency=self.sampling_rate)
                 if self.ceptral_normalize:
-                    feature = self.utterance_cmvn(feature, self.normalize_means, self.normalize_vars)
+                    feature = utterance_cmvn(feature, self.normalize_means, self.normalize_vars, self.gpu_id)
                 difference = self.max_audio_frames - feature.size(0)
                 if difference < 0:
                     continue
