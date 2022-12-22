@@ -66,14 +66,12 @@ class Dataset(object):
         print("Starting %d workers for building datasets ... " % workers_num)
         assert (workers_num >= 1)
         if workers_num == 1:
-            self.worker(0, 1, lines_num)
+            self.worker(0, 0, lines_num)
         else:
             pool = Pool(workers_num)
             for i in range(workers_num):
                 start = i * lines_num // workers_num
                 end = (i + 1) * lines_num // workers_num
-                if start == 0:
-                    start = 1
                 pool.apply_async(func=self.worker, args=[i, start, end])
             pool.close()
             pool.join()
@@ -878,9 +876,10 @@ class FileWithTextDataset(Dataset):
                 pos += 1
 
                 line = line.strip().split('\t')
-
                 text = line[0]
                 path = line[1]
+                if pos == 1 and text == "text":
+                    continue
                 src = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text))
                 src = src[:self.seq_length - 2]
                 src = [self.vocab.get(CLS_TOKEN)] + src + [self.vocab.get(SEP_TOKEN)]
