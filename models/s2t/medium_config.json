@@ -16,7 +16,7 @@
   "decoder": "transformer",
   "target": ["lm"],
   "has_lmtarget_bias": false,
-  "conv_channels": [1024, 512],
+  "conv_channels": [1024, 1024],
   "audio_feature_size": 80,
   "conv_kernel_sizes": [5, 5],
   "layernorm_positioning": "pre",
