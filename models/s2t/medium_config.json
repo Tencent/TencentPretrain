@@ -1,9 +1,9 @@
 {
-  "emb_size": 256,
+  "emb_size": 512,
   "feedforward_size": 2048,
-  "hidden_size": 256,
+  "hidden_size": 512,
   "hidden_act": "relu",
-  "heads_num": 4,
+  "heads_num": 8,
   "layers_num": 12,
   "decoder_layers_num": 6,
   "max_audio_frames": 6000,
@@ -16,7 +16,7 @@
   "decoder": "transformer",
   "target": ["lm"],
   "has_lmtarget_bias": false,
-  "conv_channels": [1024, 512],
+  "conv_channels": [1024, 1024],
   "audio_feature_size": 80,
   "conv_kernel_sizes": [5, 5],
   "layernorm_positioning": "pre",
@@ -26,13 +26,13 @@
   "scheduler": "inverse_sqrt",
   "audio_preprocess": ["normalize_means", "normalize_vars", "ceptral_normalize"],
   "specaugment":{
-   "freq_mask_F": 27,
-   "freq_mask_N": 2,
-   "time_mask_N": 2,
-   "time_mask_T": 100,
-   "time_mask_p": 1.0,
-   "time_wrap_W": 0
-  },
-  "label_smoothing": 0.1,
-  "ignore_index": true
+    "freq_mask_F": 27,
+    "freq_mask_N": 2,
+    "time_mask_N": 2,
+    "time_mask_T": 100,
+    "time_mask_p": 1.0,
+    "time_wrap_W": 0
+   },
+   "label_smoothing": 0.1,
+   "ignore_index": true
 }

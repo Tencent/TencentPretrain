@@ -5,6 +5,7 @@ import torch
 from tencentpretrain.utils.constants import *
 from tencentpretrain.utils.tokenizers import *
 from tencentpretrain.utils.mask import mask_seq
+from tencentpretrain.utils.augment import SpecAugment
 
 
 class Dataloader(object):
@@ -731,6 +732,7 @@ class AudioDataloader(Dataloader):
         self.audio_feature_size = args.audio_feature_size
         self.conv_layers_num = args.conv_layers_num
         self.max_audio_frames = args.max_audio_frames
+        self.specaugment = None
 
         if "normalize_means" not in args.audio_preprocess:
             self.normalize_means = False
@@ -738,19 +740,24 @@ class AudioDataloader(Dataloader):
             self.normalize_vars = False
         if "ceptral_normalize" not in args.audio_preprocess:
             self.ceptral_normalize = False
+        if "sepcaugment" in args:
+            self.specaugment = SpecAugment(args)
 
-    def utterance_cmvn(self, x, normalize_means, normalize_vars):
-        mean = x.mean(axis=0)
-        square_sums = (x ** 2).sum(axis=0)
+def utterance_cmvn(x, normalize_means=True, normalize_vars=True, gpu_id=None):
+    mean = x.mean(axis=0)
+    square_sums = (x ** 2).sum(axis=0)
 
-        if normalize_means:
-            x = torch.sub(x, mean)
-        if normalize_vars:
-            var = square_sums / x.size(0) - mean ** 2
-            std = torch.sqrt(torch.maximum(var, torch.full(var.size() , 1e-10)))
-            x = torch.div(x, std)
+    if normalize_means:
+        x = torch.sub(x, mean)
+    if normalize_vars:
+        var = square_sums / x.size(0) - mean ** 2
+        if gpu_id is not None:
+            std = torch.sqrt(torch.maximum(var, torch.full(var.size(), 1e-10).cuda(gpu_id)))
+        else:
+            std = torch.sqrt(torch.maximum(var, torch.full(var.size(), 1e-10)))
+        x = torch.div(x, std)
 
-        return x
+    return x
 
 
 class S2tDataloader(AudioDataloader):
@@ -759,8 +766,7 @@ class S2tDataloader(AudioDataloader):
         import torchaudio
         import torchaudio.compliance.kaldi as ta_kaldi
 
-        padding_vector = torch.FloatTensor(self.audio_feature_size * [self.padding_value] if self.audio_feature_size > 1 else self.padding_value).unsqueeze(0)
-
+        padding_vector = torch.FloatTensor(self.audio_feature_size * [self.padding_value] if self.audio_feature_size > 1 else self.padding_value).unsqueeze(0).cuda(self.gpu_id)
         while True:
             while self._empty():
                 self._fill_buf()
@@ -784,23 +790,30 @@ class S2tDataloader(AudioDataloader):
 
                 waveform, _ = torchaudio.load(ins[2])  # waveform, sample_rate
                 waveform = waveform * (2 ** 15)  # Kaldi compliance: 16-bit signed integers
+                waveform = waveform.cuda(self.gpu_id)
                 feature = ta_kaldi.fbank(waveform, num_mel_bins=self.audio_feature_size,
                                          sample_frequency=self.sampling_rate)
                 if self.ceptral_normalize:
-                    feature = self.utterance_cmvn(feature, self.normalize_means, self.normalize_vars)
+                    feature = utterance_cmvn(feature, self.normalize_means, self.normalize_vars, self.gpu_id)
                 difference = self.max_audio_frames - feature.size(0)
                 if difference < 0:
                     continue
                 else:
                     src_audio.append(torch.cat([feature] + [padding_vector] * difference))
-                seg_audio.append([1] * int(self.max_audio_frames / self.conv_layers_num / 2))
-                tgt_in.append(text_single[:-1])
+
+                src_pad_num = int(self.max_audio_frames / self.conv_layers_num / 2) - int(feature.size(0) / self.conv_layers_num / 2)
+                seg_audio.append([1] * int(feature.size(0) / self.conv_layers_num / 2) + [0] * src_pad_num)
                 tgt_out.append(text_single[1:])
+                text_single[-pad_num-1] = self.vocab.get(PAD_TOKEN)
+
+                tgt_in.append(text_single[:-1])
                 pad_num = max(pad_num - 1, 0)  # left shifted, pad_num >= 0
                 tgt_seg.append([1] * (len(tgt_in[-1]) - pad_num) + [0] * pad_num)
 
             if len(src_audio) == 0:
                 continue
+            if self.specaugment:
+                src_audio = self.specaugment(src_audio)
 
             yield  torch.stack(src_audio, 0), \
                    torch.LongTensor(tgt_out), \

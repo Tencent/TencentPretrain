@@ -49,7 +49,7 @@ TencentPretrain有如下几方面优势:
 * 如果在序列标注下游任务中使用CRF，需要安装[pytorch-crf](https://github.com/kmkurn/pytorch-crf)
 * 如果使用超大模型，需要安装[DeepSpeed](https://github.com/microsoft/DeepSpeed)
 * 如果涉及图像模型，需要安装torchvision
-* 如果涉及语音模型，需要安装torchaudio
+* 如果涉及语音模型，需要安装torchaudio，在使用specaugment进行数据增强时部分设置会用到opencv-python
 
 <br>
 

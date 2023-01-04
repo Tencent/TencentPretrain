@@ -876,9 +876,10 @@ class FileWithTextDataset(Dataset):
                 pos += 1
 
                 line = line.strip().split('\t')
-
                 text = line[0]
                 path = line[1]
+                if pos == 1 and text == "text":
+                    continue
                 src = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text))
                 src = src[:self.seq_length - 2]
                 src = [self.vocab.get(CLS_TOKEN)] + src + [self.vocab.get(SEP_TOKEN)]
@@ -943,6 +944,7 @@ class FileDataset(Dataset):
                     break
 
         dataset_writer.close()
+
 
 class VitDataset(FileWithLabelDataset):
     pass

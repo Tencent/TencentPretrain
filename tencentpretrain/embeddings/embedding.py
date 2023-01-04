@@ -1,5 +1,5 @@
 import torch.nn as nn
-
+import torch
 from tencentpretrain.layers.layer_norm import LayerNorm
 
 
@@ -22,6 +22,7 @@ class Embedding(nn.Module):
 
         for i, embedding_name in enumerate(self.embedding_name_list):
             embedding = getattr(self, embedding_name)
+
             if i == 0:
                 emb = embedding(src, seg)
             else:
