@@ -31,7 +31,7 @@ class SpecAugment():
 
     def __call__(self, spectrogram):
         assert len(spectrogram.shape) == 2, "spectrogram must be a 2-D tensor."
-
+        spectrogram = spectrogram.cpu().numpy()
         distorted = spectrogram.copy()  # make a copy of input spectrogram.
         num_frames = spectrogram.shape[0]  # or 'tau' in the paper.
         num_freqs = spectrogram.shape[1]  # or 'miu' in the paper.
@@ -54,10 +54,10 @@ class SpecAugment():
                 w = np.random.randint(-self.time_warp_w + 1, self.time_warp_w)
                 upper, lower = distorted[:w0, :], distorted[w0:, :]
                 upper = cv2.resize(
-                    upper, dsize=(num_freqs, w0 + w), interpolation=cv2.INTER_LINEAR
+                    upper.cpu().numpy(), dsize=(num_freqs, w0 + w), interpolation=cv2.INTER_LINEAR
                 )
                 lower = cv2.resize(
-                    lower,
+                    lower.cpu().numpy(),
                     dsize=(num_freqs, num_frames - w0 - w),
                     interpolation=cv2.INTER_LINEAR,
                 )
