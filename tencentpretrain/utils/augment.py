@@ -54,10 +54,10 @@ class SpecAugment():
                 w = np.random.randint(-self.time_warp_w + 1, self.time_warp_w)
                 upper, lower = distorted[:w0, :], distorted[w0:, :]
                 upper = cv2.resize(
-                    upper.cpu().numpy(), dsize=(num_freqs, w0 + w), interpolation=cv2.INTER_LINEAR
+                    upper, dsize=(num_freqs, w0 + w), interpolation=cv2.INTER_LINEAR
                 )
                 lower = cv2.resize(
-                    lower.cpu().numpy(),
+                    lower,
                     dsize=(num_freqs, num_frames - w0 - w),
                     interpolation=cv2.INTER_LINEAR,
                 )
