@@ -795,7 +795,7 @@ class S2tDataloader(AudioDataloader):
                                          sample_frequency=self.sampling_rate)
                 if self.ceptral_normalize:
                     feature = utterance_cmvn(feature, self.normalize_means, self.normalize_vars, self.gpu_id)
-                if self.specaugment:
+                if self.specaugment is not None:
                     feature = torch.from_numpy(self.specaugment(feature)).cuda(self.gpu_id)
                 difference = self.max_audio_frames - feature.size(0)
                 if difference < 0:
