@@ -35,7 +35,7 @@ def model_opts(parser):
     parser.add_argument("--has_residual_attention", action="store_true", help="Add residual attention.")
     parser.add_argument("--has_lmtarget_bias", action="store_true",
                         help="Add bias on output_layer for lm target.")
-    parser.add_argument("--target", choices=["sp", "lm", "mlm", "bilm", "cls", "clr"], default="mlm", nargs='+',
+    parser.add_argument("--target", choices=["sp", "lm", "mlm", "bilm", "cls", "clr", "ner", "decode"], default="mlm", nargs='+',
                         help="The training target of the pretraining model.")
     parser.add_argument("--tie_weights", action="store_true",
                         help="Tie the word embedding and softmax weights.")

@@ -6,23 +6,16 @@ from tencentpretrain.decoders import *
 from tencentpretrain.embeddings import *
 
 
-class LmDecoderTarget(nn.Module):
+class DecodeTarget(nn.Module):
     """
     Language Model Target
     """
 
     def __init__(self, args, vocab_size):
-        super(LmDecoderTarget, self).__init__()
+        super(DecodeTarget, self).__init__()
         self.vocab_size = vocab_size
         self.hidden_size = args.hidden_size
-        if "label_smoothing" in args:
-            self.label_smoothing = args.label_smoothing
-        else:
-            self.label_smoothing = None
-        if "ignore_index" in args and args.ignore_index:
-            self.ignore_index = self.tokenizer.vocab.get(PAD_TOKEN)
-        else:
-            self.ignore_index = None
+
         args.decoder_layers_num = 2
         self.tgt_embedding = Embedding(args)
         for embedding_name in args.tgt_embedding:
@@ -47,24 +40,9 @@ class LmDecoderTarget(nn.Module):
             correct = torch.tensor(0.0)
         else:
             correct = torch.sum((output.argmax(dim=-1).eq(tgt_lm)).float())
-        if self.label_smoothing is None:
-            loss = self.criterion(output, tgt_lm)
-        else:
-            if tgt_lm.dim() == output.dim() - 1:
-                tgt_lm = tgt_lm.unsqueeze(-1)
-            nll_loss = -output.gather(dim=-1, index=tgt_lm)
-            smooth_loss = -output.sum(dim=-1, keepdim=True)
-            if self.ignore_index is not None:
-                pad_mask = tgt_lm.eq(self.ignore_index)
-                nll_loss.masked_fill_(pad_mask, 0.0)
-                smooth_loss.masked_fill_(pad_mask, 0.0)
-            else:
-                nll_loss = nll_loss.squeeze(-1)
-                smooth_loss = smooth_loss.squeeze(-1)
-            nll_loss = nll_loss.mean()
-            smooth_loss = smooth_loss.mean()
-            eps_i = self.label_smoothing / (output.size(-1) - 1)
-            loss = (1.0 - self.label_smoothing - eps_i) * nll_loss + eps_i * smooth_loss
+
+        loss = self.criterion(output, tgt_lm)
+
 
         return loss, correct, denominator
 

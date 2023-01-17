@@ -56,7 +56,6 @@ class Dataset(object):
         self.span_max_length = args.span_max_length
         self.docs_buffer_size = args.docs_buffer_size
         self.dup_factor = args.dup_factor
-        self.tgt_seq_length = args.tgt_seq_length
 
     def build_and_save(self, workers_num):
         """
@@ -862,7 +861,11 @@ class ClsMlmDataset(Dataset):
         dataset_writer.close()
 
 
-class ClsMlmNerDataset(Dataset):
+class ClsMlmNerDecodeDataset(Dataset):
+    def __init__(self, args, vocab, tokenizer):
+        super(ClsMlmNerDecodeDataset, self).__init__(args, vocab, tokenizer)
+        self.tgt_seq_length = args.tgt_seq_length
+
     def worker(self, proc_id, start, end):
         print("Worker %d is building dataset ... " % proc_id)
         set_seed(self.seed)
@@ -878,107 +881,40 @@ class ClsMlmNerDataset(Dataset):
                 line = f.readline()
                 pos += 1
                 line = line.strip().split('\t')
-                if len(line) == 3:  # For sentence pair input.
-                    cls_label = int(line[0])
-                    text = line[1]
-                    tgt_token = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line[2]))
-                    src = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text))
-
-                    tgt_cls = cls_label
-                    seg_pos = [len(src)+2]
-
-                else:
-                    if pos >= end:
-                        break
-                    continue
-
-                if len(src) >= self.seq_length-2:
-                    pad_num = 0
-                    src = src[:self.seq_length-2]
-                    seg_pos = [self.seq_length]
-
-                else:
-                    pad_num = self.seq_length -2 - len(src)
-                tgt_ner = [0 for _ in range(len(src))]
-                for i in range(len(src)):
-                    if src[i:i + len(tgt_token)] == tgt_token:
-                        tgt_ner[i:i + len(tgt_token)] = [2 for _ in range(len(tgt_token))]
-                        tgt_ner[i] = 1
-                src = [self.vocab.get(CLS_TOKEN)] + src + [self.vocab.get(SEP_TOKEN)]
-                tgt_ner = [0] + tgt_ner + [0]
-                src = (src, pad_num)
-                if not self.dynamic_masking:
-                    src_single, pad_num = src
-                    src_single, tgt_mlm = mask_seq(src_single, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob, self.span_max_length)
-                    src = (src_single, pad_num)
-                    instance = (src, tgt_mlm, tgt_cls, tgt_ner, seg_pos)
-                else:
-                    instance = (src, tgt_cls, tgt_ner, seg_pos)
-
-                pickle.dump(instance, dataset_writer)
-
-                if pos >= end:
-                    break
-
-        dataset_writer.close()
-
-
-class ClsMlmNerLmDataset(Dataset):
-    def worker(self, proc_id, start, end):
-        print("Worker %d is building dataset ... " % proc_id)
-        set_seed(self.seed)
-        dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
-        pos = 0
-
-
-        with open(self.corpus_path, mode="r", encoding="utf-8") as f:
-            while pos < start:
-                f.readline()
-                pos += 1
-            while True:
-                line = f.readline()
-                pos += 1
-                line = line.strip().split('\t')
-
-                if len(line) == 4:  # For sentence pair input.
-                    cls_label = int(line[0])
+                if len(line) == 4:
+                    tgt_cls = int(line[0])
                     text = line[1]
                     decoder_text = line[3]
-                    tmp_l = line[2].split(',')
-#                    tgt_token = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line[2]))
+                    ner_target = line[2].split(',')
                     src = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text))
+                    src = [self.vocab.get(CLS_TOKEN)] + src + [self.vocab.get(SEP_TOKEN)]
                     tgt_lm = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(decoder_text))
                     tgt_lm = [self.vocab.get(CLS_TOKEN)] + tgt_lm + [self.vocab.get(SEP_TOKEN)]
-
-
-                    tgt_cls = cls_label
-                    seg_pos = [len(src)+2]
+                    seg_pos = [len(src)]
 
                 else:
                     if pos >= end:
                         break
                     continue
 
-                if len(src) >= self.seq_length-2:
+                if len(src) >= self.seq_length:
                     pad_num = 0
-                    src = src[:self.seq_length-2]
+                    src = src[:self.seq_length]
                     seg_pos = [self.seq_length]
-
                 else:
-                    pad_num = self.seq_length -2 - len(src)
+                    pad_num = self.seq_length - len(src)
                 if len(tgt_lm) >= self.tgt_seq_length:
+                    tgt_lm = tgt_lm[:self.seq_length]
                     pad_num_lm = 0
                 else:
                     pad_num_lm = self.tgt_seq_length - len(tgt_lm)
                 tgt_ner = [0 for _ in range(len(src))]
-                for tgt_token in tmp_l:
+                for tgt_token in ner_target:
                     tgt_token = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(tgt_token))
                     for i in range(len(src)):
                         if src[i:i + len(tgt_token)] == tgt_token:
                             tgt_ner[i:i + len(tgt_token)] = [2 for _ in range(len(tgt_token))]
                             tgt_ner[i] = 1
-                src = [self.vocab.get(CLS_TOKEN)] + src + [self.vocab.get(SEP_TOKEN)]
-                tgt_ner = [0] + tgt_ner + [0]
                 src = (src, pad_num)
                 tgt_lm = (tgt_lm, pad_num_lm)
 
@@ -1013,9 +949,10 @@ class FileWithTextDataset(Dataset):
                 pos += 1
 
                 line = line.strip().split('\t')
-
                 text = line[0]
                 path = line[1]
+                if pos == 1 and text == "text":
+                    continue
                 src = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text))
                 src = src[:self.seq_length - 2]
                 src = [self.vocab.get(CLS_TOKEN)] + src + [self.vocab.get(SEP_TOKEN)]
