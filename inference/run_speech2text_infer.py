@@ -79,7 +79,7 @@ def main():
             tgt_in_batch = torch.zeros(src_batch.size()[0], 1, dtype = torch.long, device = args.device)
             current_batch_size=tgt_in_batch.size()[0]
             for j in range(current_batch_size):
-                tgt_in_batch[j][0] = torch.LongTensor(SEP_ID) #torch.LongTensor(CLS_ID) for tencentpretrain model
+                tgt_in_batch[j][0] = torch.LongTensor(CLS_ID) # SEP_ID for huggingface model
 
             with torch.no_grad():
                 memory_bank, emb = model(src_batch, None, seg_batch, None, only_use_encoder=True)
@@ -87,7 +87,7 @@ def main():
             step = 0
             scores = torch.zeros(current_batch_size, beam_width, tgt_seq_length)
             tokens = torch.zeros(current_batch_size, beam_width, tgt_seq_length+1, dtype = torch.long)
-            tokens[:,:,0] = torch.LongTensor(args.tokenizer.convert_tokens_to_ids([SEP_TOKEN])) #2
+            tokens[:,:,0] = torch.LongTensor(args.tokenizer.convert_tokens_to_ids([CLS_TOKEN])) # SEP_TOKEN for huggingface model
             emb = emb.repeat(1, beam_width, 1).reshape(current_batch_size * beam_width, -1, int(args.conv_channels[-1] / 2)) #same batch nearby
             memory_bank = memory_bank.repeat(1, beam_width, 1).reshape(current_batch_size * beam_width, -1, args.emb_size) 
             tgt_in_batch = tgt_in_batch.repeat(beam_width, 1)
@@ -129,9 +129,8 @@ def main():
             for i in range(current_batch_size):
                 for j in range(1):
                     res = "".join([args.tokenizer.inv_vocab[token_id.item()] for token_id in tokens[i,j,:]])
-                    res = res.split(SEP_TOKEN)[1].split(CLS_TOKEN)[0] # res.split(CLS_TOKEN)[1].split(SEP_TOKEN)[0] for tencentpretrain model
+                    res = res.split(SEP_TOKEN)[0].split(CLS_TOKEN)[1] # res.split(SEP_TOKEN)[1] for huggingface model
                     res = res.replace('▁',' ')
-
                     f.write(res)
                     f.write("\n")
 
