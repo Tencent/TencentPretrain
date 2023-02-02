@@ -1,5 +1,5 @@
 """
-This script provides an exmaple to wrap TencentPretrain for C3 (a multiple choice dataset).
+This script provides an example to wrap TencentPretrain for C3 (a multiple choice dataset).
 """
 import sys
 import os
