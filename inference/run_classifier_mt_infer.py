@@ -167,10 +167,8 @@ def main():
                                                   [[] for _ in range(len(args.labels_num_list))], \
                                                   [[] for _ in range(len(args.labels_num_list))]
 
-
             with torch.no_grad():
                 output_logits, last_hidden = model(src_batch, None, seg_batch, args.labels_num_list)
-
 
             for dataset_id in range(len(args.labels_num_list)):
 
@@ -195,7 +193,6 @@ def main():
                         f.write("\t" + " ".join([str(v) for v in logits_list[y][x]]))
                     if args.output_prob:
                         f.write("\t" + " ".join([str(v) for v in prob_list[y][x]]))
-
                 f.write("\n")
 
 
