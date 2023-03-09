@@ -1,0 +1,17 @@
+{
+  "emb_size": 4096,
+  "feedforward_size": 11008,
+  "hidden_size": 4096,
+  "hidden_act": "silu",
+  "heads_num": 32,
+  "layers_num": 32,
+  "dropout": 0.1,
+  "data_processor": "lm",
+  "embedding": ["word"],
+  "remove_embedding_layernorm": true,
+  "encoder": "transformer",
+  "mask": "causal",
+  "layernorm_positioning": "pre",
+  "target": ["lm"],
+  "tie_weights": true
+}

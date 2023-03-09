@@ -1,5 +1,5 @@
 import torch.nn as nn
-from tencentpretrain.layers.layer_norm import LayerNorm, T5LayerNorm
+from tencentpretrain.layers.layer_norm import *
 from tencentpretrain.layers.position_ffn import PositionwiseFeedForward, GatedFeedForward
 from tencentpretrain.layers.multi_headed_attn import MultiHeadedAttention
 from tencentpretrain.layers.relative_position_embedding import RelativePositionEmbedding
@@ -43,6 +43,9 @@ class TransformerLayer(nn.Module):
         if args.layernorm == "t5":
             self.layer_norm_1 = T5LayerNorm(args.hidden_size)
             self.layer_norm_2 = T5LayerNorm(args.hidden_size)
+        elif args.layernorm == "rms":
+            self.layer_norm_1 = RMSNorm(args.hidden_size)
+            self.layer_norm_2 = RMSNorm(args.hidden_size)
         else:
             self.layer_norm_1 = LayerNorm(args.hidden_size)
             self.layer_norm_2 = LayerNorm(args.hidden_size)
