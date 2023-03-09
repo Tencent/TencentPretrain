@@ -1,6 +1,7 @@
 import math
 import torch
 import torch.nn as nn
+from tencentpretrain.utils.rope import apply_rotary_emb
 
 
 class MultiHeadedAttention(nn.Module):
@@ -24,7 +25,7 @@ class MultiHeadedAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.final_linear = nn.Linear(self.inner_hidden_size, hidden_size, bias=has_bias)
 
-    def forward(self, key, value, query, mask, position_bias=None, has_residual_attention=False, prev_attn=None):
+    def forward(self, key, value, query, mask, position_bias=None, has_residual_attention=False, prev_attn=None, freqs_cis=None):
         """
         Args:
             key: [batch_size x seq_length x hidden_size]
@@ -57,7 +58,8 @@ class MultiHeadedAttention(nn.Module):
                              transpose(1, 2) \
                              for l, x in zip(self.linear_layers, (query, key, value))
                             ]
-
+        if freqs_cis is not None:
+            query, key = apply_rotary_emb(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
         scores = torch.matmul(query, key.transpose(-2, -1))
         if position_bias is not None:
             scores = scores + position_bias

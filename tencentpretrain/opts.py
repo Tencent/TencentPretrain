@@ -7,6 +7,8 @@ def model_opts(parser):
                         help="Max sequence length for word embedding.")
     parser.add_argument("--relative_position_embedding", action="store_true",
                         help="Use relative position embedding.")
+    parser.add_argument("--rotary_position_embedding", action="store_true",
+                        help="Use relative position embedding.")
     parser.add_argument("--share_embedding", action="store_true",
                         help="Shared embedding and target embedding parameters.")
     parser.add_argument("--remove_embedding_layernorm", action="store_true",
