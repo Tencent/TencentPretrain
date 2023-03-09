@@ -180,7 +180,6 @@ class LmDataloader(Dataloader):
                 src_single, pad_num = ins[0]
                 for _ in range(pad_num):
                     src_single.append(self.vocab.get(PAD_TOKEN))
-                print(src)
                 src.append(src_single[:-1])
                 tgt.append(src_single[1:])
                 seg.append([1] * ins[1][0] + [0] * (len(src_single) - 1 - ins[1][0]))
