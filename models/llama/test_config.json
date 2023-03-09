@@ -13,6 +13,7 @@
   "remove_embedding_layernorm": true,
   "rotary_position_embedding": true,
   "encoder": "transformer",
+  "feed_forward": "gated",
   "mask": "causal",
   "layernorm_positioning": "pre",
   "layernorm": "rms",

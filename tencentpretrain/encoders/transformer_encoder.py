@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from tencentpretrain.utils.rope import precompute_freqs_cis
 from tencentpretrain.layers.transformer import TransformerLayer
-from tencentpretrain.layers.layer_norm import LayerNorm, T5LayerNorm
+from tencentpretrain.layers.layer_norm import *
 from tencentpretrain.layers.relative_position_embedding import RelativePositionEmbedding
 
 class TransformerEncoder(nn.Module):
@@ -39,6 +39,8 @@ class TransformerEncoder(nn.Module):
         if self.layernorm_positioning == "pre":
             if args.layernorm == "t5":
                 self.layer_norm = T5LayerNorm(args.hidden_size)
+            elif args.layernorm == "rms":
+                self.layer_norm = RMSNorm(args.hidden_size)
             else:
                 self.layer_norm = LayerNorm(args.hidden_size)
 
