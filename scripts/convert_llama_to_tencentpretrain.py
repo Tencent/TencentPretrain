@@ -35,9 +35,9 @@ for i in range(args.layers_num):
     output_model["encoder.transformer." + str(i) + ".feed_forward.linear_gate.weight"] = \
         input_model["layers." + str(i) + ".feed_forward.w1.weight"]
     output_model["encoder.transformer." + str(i) + ".feed_forward.linear_1.weight"] = \
-        input_model["layers." + str(i) + ".feed_forward.w2.weight"]
-    output_model["encoder.transformer." + str(i) + ".feed_forward.linear_2.weight"] = \
         input_model["layers." + str(i) + ".feed_forward.w3.weight"]
+    output_model["encoder.transformer." + str(i) + ".feed_forward.linear_2.weight"] = \
+        input_model["layers." + str(i) + ".feed_forward.w2.weight"]
 
     output_model["encoder.transformer." + str(i) + ".layer_norm_2.weight"] = \
         input_model["layers." + str(i) + ".ffn_norm.weight"]
