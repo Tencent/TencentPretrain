@@ -15,5 +15,5 @@
   "mask": "causal",
   "layernorm_positioning": "pre",
   "layernorm": "rms",
-  "target": ["lm"],
+  "target": ["lm"]
 }
