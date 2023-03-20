@@ -2,7 +2,7 @@ import time
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel
-from tencentpretrain.model_loader import load_model
+from tencentpretrain.model_loader import *
 from tencentpretrain.model_saver import save_model
 from tencentpretrain.model_builder import build_model
 from tencentpretrain.utils.logging import init_logger
@@ -23,12 +23,20 @@ def train_and_validate(args):
     args.vocab = args.tokenizer.vocab
 
     # Build model.
-    model_for_training = build_model(args)
+    if args.deepspeed and args.enable_zero3:
+        import deepspeed
+        with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
+            model_for_training = build_model(args)
+    else:
+        model_for_training = build_model(args)
 
     # Load or initialize parameters.
     if args.pretrained_model_path is not None:
         # Initialize with pretrained model.
-        model_for_training = load_model(model_for_training, args.pretrained_model_path)
+        if args.deepspeed and args.enable_zero3:
+            model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path)
+        else:
+            model_for_training = load_model(model_for_training, args.pretrained_model_path)
     else:
         # Initialize with normal distribution.
         if args.deep_init:
