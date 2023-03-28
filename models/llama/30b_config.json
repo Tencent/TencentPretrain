@@ -1,0 +1,21 @@
+{
+  "emb_size": 6656,
+  "feedforward_size": 17920,
+  "hidden_size": 6656,
+  "hidden_act": "silu",
+  "heads_num": 52,
+  "layers_num": 60,
+  "dropout": 0.1,
+  "data_processor": "lm",
+  "max_seq_length": 2048,
+  "embedding": ["word"],
+  "remove_transformer_bias": true,
+  "remove_embedding_layernorm": true,
+  "rotary_position_embedding": true,
+  "encoder": "transformer",
+  "feed_forward": "gated",
+  "mask": "causal",
+  "layernorm_positioning": "pre",
+  "layernorm": "rms",
+  "target": ["lm"]
+}
