@@ -531,12 +531,16 @@ class DalleTrainer(LmTrainer):
     pass
 
 
+class AlpacaTrainer(LmTrainer):
+    pass
+
+
 str2trainer = {"bert": BertTrainer, "mlm": MlmTrainer, "lm": LmTrainer,
                "albert": AlbertTrainer, "bilm": BilmTrainer, "cls": ClsTrainer,
                "mt": MtTrainer, "t5": T5Trainer, "gsg": GsgTrainer,
                "bart": BartTrainer, "prefixlm": PrefixlmTrainer, "cls_mlm": ClsMlmTrainer,
                "vit": VitTrainer, "vilt": ViltTrainer, "clip": ClipTrainer, "s2t": S2tTrainer,
-               "beit": BeitTrainer, "dalle": DalleTrainer}
+               "beit": BeitTrainer, "dalle": DalleTrainer, "alpaca": AlpacaTrainer}
 
 
 def worker(proc_id, gpu_ranks, args, model_for_training, model_for_dataloader=None):

@@ -931,3 +931,7 @@ class DalleDataloader(VisionDataloader):
             yield torch.LongTensor(src), \
                   torch.LongTensor(tgt), \
                   torch.LongTensor(seg)
+
+
+class AlpacaDataloader(LmDataloader):
+    pass

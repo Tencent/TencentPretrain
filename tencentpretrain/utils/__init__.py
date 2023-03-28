@@ -19,7 +19,7 @@ str2dataloader = {"bert": BertDataloader, "lm": LmDataloader, "mlm": MlmDataload
                   "t5": T5Dataloader, "gsg": GsgDataloader, "bart": BartDataloader,
                   "cls": ClsDataloader, "prefixlm": PrefixlmDataloader, "cls_mlm": ClsMlmDataloader,
                   "vit": VitDataloader, "vilt": ViltDataloader, "clip": ClipDataloader, "s2t": S2tDataloader,
-                  "beit":BeitDataloader, "dalle": DalleDataloader}
+                  "beit":BeitDataloader, "dalle": DalleDataloader, "alpaca": AlpacaDataloader}
 
 str2act = {"gelu": gelu, "gelu_fast": gelu_fast, "relu": relu, "silu": silu, "linear": linear}
 
