@@ -1,6 +1,7 @@
 import os
 import random
 import pickle
+import json
 import torch
 from multiprocessing import Pool
 from tencentpretrain.utils.constants import *
@@ -444,7 +445,7 @@ class LmDataset(Dataset):
                 line = f.readline()
                 pos += 1
 
-                document = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line))
+                document = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line.strip()))
                 document = [self.vocab.get(CLS_TOKEN)] + document + [self.vocab.get(SEP_TOKEN)]
 
                 instances_num = len(document) // (self.seq_length + 1)
@@ -968,3 +969,45 @@ class BeitDataset(FileDataset):
 
 class DalleDataset(FileWithTextDataset):
     pass
+
+
+class AlpacaDataset(Dataset):
+    """For self-instruct in json files (Stanford Alpaca)"""
+    def worker(self, proc_id, start, end):
+        print("Worker %d is building dataset ... " % proc_id)
+        set_seed(self.seed)
+        dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
+        pos = 0
+        with open(self.corpus_path, mode="r", encoding="utf-8") as f:
+            while pos < start:
+                f.readline()
+                pos += 1
+            while True:
+                line = f.readline()
+                pos += 1
+                data = json.loads(line)
+
+                instruction = data.get("instruction", "").replace('\\n', '\n')
+                input = data.get("input", "").replace('\\n', '\n')
+                output = data.get("output", "").replace('\\n', '\n')
+                line_text = instruction + input + output
+                document = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line_text))
+                document = [self.vocab.get(CLS_TOKEN)] + document + [self.vocab.get(SEP_TOKEN)]
+
+                instances_num = len(document) // (self.seq_length + 1)
+                for i in range(instances_num):
+                    src = document[i * (self.seq_length + 1): (i + 1) * (self.seq_length + 1)]
+                    seg_pos = [self.seq_length]
+                    src = (src, 0)
+                    pickle.dump((src, seg_pos), dataset_writer)
+
+                src = document[instances_num * (self.seq_length + 1):]
+                if len(src) > 0:
+                    seg_pos = [len(src)]
+                    pad_num = self.seq_length + 1 - len(src)
+                    src = (src, pad_num)
+                    pickle.dump((src, seg_pos), dataset_writer)
+                if pos >= end:
+                    break
+
+        dataset_writer.close()

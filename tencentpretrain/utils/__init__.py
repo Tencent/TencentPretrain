@@ -13,13 +13,13 @@ str2dataset = {"bert": BertDataset, "lm": LmDataset, "mlm": MlmDataset,
                "t5": T5Dataset, "gsg": GsgDataset, "bart": BartDataset,
                "cls": ClsDataset, "prefixlm": PrefixlmDataset, "cls_mlm": ClsMlmDataset,
                "vit": VitDataset, "vilt": ViltDataset, "clip": ClipDataset, "s2t": S2tDataset,
-               "beit":BeitDataset, "dalle": DalleDataset}
+               "beit":BeitDataset, "dalle": DalleDataset, "alpaca": AlpacaDataset}
 str2dataloader = {"bert": BertDataloader, "lm": LmDataloader, "mlm": MlmDataloader,
                   "bilm": BilmDataloader, "albert": AlbertDataloader, "mt": MtDataloader,
                   "t5": T5Dataloader, "gsg": GsgDataloader, "bart": BartDataloader,
                   "cls": ClsDataloader, "prefixlm": PrefixlmDataloader, "cls_mlm": ClsMlmDataloader,
                   "vit": VitDataloader, "vilt": ViltDataloader, "clip": ClipDataloader, "s2t": S2tDataloader,
-                  "beit":BeitDataloader, "dalle": DalleDataloader}
+                  "beit":BeitDataloader, "dalle": DalleDataloader, "alpaca": AlpacaDataloader}
 
 str2act = {"gelu": gelu, "gelu_fast": gelu_fast, "relu": relu, "silu": silu, "linear": linear}
 

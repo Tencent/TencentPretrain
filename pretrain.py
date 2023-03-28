@@ -44,7 +44,7 @@ def main():
     model_opts(parser)
     parser.add_argument("--data_processor",
                         choices=["bert", "lm", "mlm", "bilm", "albert", "mt", "t5", "cls",
-                                 "prefixlm", "gsg", "bart", "cls_mlm", "vit", "vilt", "clip", "s2t", "beit", "dalle"], default="bert",
+                                 "prefixlm", "gsg", "bart", "cls_mlm", "vit", "vilt", "clip", "s2t", "beit", "dalle", "alpaca"], default="bert",
                         help="The data processor of the pretraining model.")
     parser.add_argument("--deep_init", action="store_true",
                         help="Scaling initialization of projection layers by a "
