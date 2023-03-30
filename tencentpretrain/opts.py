@@ -208,6 +208,8 @@ def tgt_tokenizer_opts(parser):
 def deepspeed_opts(parser):
     parser.add_argument("--deepspeed", action="store_true",
                         help=".")
+    parser.add_argument("--enable_zero3", action="store_true",
+                        help=".")
     parser.add_argument("--deepspeed_config", default="models/deepspeed_config.json", type=str,
                         help=".")
     parser.add_argument("--deepspeed_checkpoint_activations", action='store_true',
