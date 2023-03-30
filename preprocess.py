@@ -25,7 +25,7 @@ def main():
                              "and process them with `processes_num` processes.")
     parser.add_argument("--data_processor",
                         choices=["bert", "lm", "mlm", "bilm", "albert", "mt", "t5", "cls", "prefixlm",
-                                 "gsg", "bart", "cls_mlm", "vit", "vilt", "clip", "s2t", "beit", "dalle"], default="bert",
+                                 "gsg", "bart", "cls_mlm", "vit", "vilt", "clip", "s2t", "beit", "dalle", "alpaca"], default="bert",
                         help="The data processor of the pretraining model.")
     parser.add_argument("--docs_buffer_size", type=int, default=100000,
                         help="The buffer size of documents in memory, specific to targets that require negative sampling.")
