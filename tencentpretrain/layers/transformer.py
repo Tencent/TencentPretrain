@@ -25,7 +25,8 @@ class TransformerLayer(nn.Module):
 
         # Multi-headed self-attention.
         self.self_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias, with_scale = with_scale
+            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+            with_scale = with_scale, lora_params=args.lora_params
         )
         self.dropout_1 = nn.Dropout(args.dropout)
 
