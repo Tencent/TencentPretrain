@@ -1,7 +1,7 @@
 import torch
 
 
-def load_model(model, model_path, lora_pretrained_model_path):
+def load_model(model, model_path, lora_pretrained_model_path=None):
     """
     Load model from saved weights.
     """
