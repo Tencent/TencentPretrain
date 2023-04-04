@@ -133,15 +133,15 @@ class Trainer(object):
             if args.deepspeed:
                 if self.current_step % self.save_checkpoint_steps == 0:
                     if args.use_lora:
-                        gpu_id = str(torch.cuda.current_device())
-                        save_model(model, self.output_model_path + "-" + gpu_id + "-" + str(self.current_step), args.use_lora)
+                        if rank == 0:
+                            save_model(model, self.output_model_path + "-" + str(self.current_step), args.use_lora)
                     else:
                         model.save_checkpoint(self.output_model_path, str(self.current_step))
                     if loss.item() < self.best_loss:
                         self.best_loss = loss.item()
                         if args.use_lora:
-                            gpu_id = str(torch.cuda.current_device())
-                            save_model(model, self.output_model_path + "-" + gpu_id + "-" + str(self.current_step), args.use_lora)
+                            if rank == 0:
+                                save_model(model, self.output_model_path + "-" + str(self.current_step), args.use_lora)
                         else:
                             model.save_checkpoint(self.output_model_path, "-best")
             else:
@@ -582,7 +582,6 @@ def worker(proc_id, gpu_ranks, args, model_for_training, model_for_dataloader=No
     # Build optimizer.
     param_optimizer = list(model_for_training.named_parameters())
     if args.use_lora:
-        import loralib as lora
         optimizer_grouped_parameters = [
             {"params": [p for n, p in param_optimizer if 'lora' in n]}
         ]
