@@ -5,7 +5,7 @@
   "optimizer": {
     "type": "Adam",
     "params": {
-      "lr": 2e-5,
+      "lr": 2e-4,
       "weight_decay": 1e-2
     }
   },
@@ -26,7 +26,7 @@
   },
   "zero_optimization": {
     "stage": 1,
-    "cpu_offload": false,
+    "cpu_offload": true,
     "contiguous_gradients": true,
     "overlap_comm": true,
     "reduce_scatter": false,
@@ -39,6 +39,5 @@
     "cpu_checkpointing": false
   },
   "wall_clock_breakdown": false,
-  "zero_allow_untested_optimizer": true,
-  "zero_force_ds_cpu_optimization": false
+  "zero_allow_untested_optimizer": true
 }

@@ -2,7 +2,7 @@ import time
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel
-from tencentpretrain.model_loader import load_model
+from tencentpretrain.model_loader import _load_state_dict_into_model, load_model
 from tencentpretrain.model_saver import save_model
 from tencentpretrain.model_builder import build_model
 from tencentpretrain.utils.logging import init_logger
@@ -23,13 +23,22 @@ def train_and_validate(args):
     args.vocab = args.tokenizer.vocab
 
     # Build model.
-    model_for_training = build_model(args)
+    if args.deepspeed and args.enable_zero3:
+        import deepspeed
+        with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
+            model_for_training = build_model(args)
+    else:
+        model_for_training = build_model(args)
 
     # Load or initialize parameters.
     if args.pretrained_model_path is not None:
         # Initialize with pretrained model.
-        model_for_training = load_model(model_for_training, args.pretrained_model_path,
+        if args.deepspeed and args.enable_zero3:
+            model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path)
+        else:
+            model_for_training = load_model(model_for_training, args.pretrained_model_path,
                                         args.lora_pretrained_model_path)
+
     else:
         # Initialize with normal distribution.
         if args.deep_init:
@@ -596,7 +605,10 @@ def worker(proc_id, gpu_ranks, args, model_for_training, model_for_dataloader=No
         ]
 
     if args.optimizer in ["adamw"]:
-        custom_optimizer = str2optimizer[args.optimizer](optimizer_grouped_parameters, lr=args.learning_rate, correct_bias=False)
+        if args.deepspeed:
+            custom_optimizer = deepspeed.ops.adam.DeepSpeedCPUAdam(optimizer_grouped_parameters, lr=args.learning_rate, bias_correction=False)
+        else:
+            custom_optimizer = str2optimizer[args.optimizer](optimizer_grouped_parameters, lr=args.learning_rate, correct_bias=False)
     else:
         custom_optimizer = str2optimizer[args.optimizer](optimizer_grouped_parameters, lr=args.learning_rate, scale_parameter=False, relative_step=False)
     if args.scheduler in ["constant"]:
