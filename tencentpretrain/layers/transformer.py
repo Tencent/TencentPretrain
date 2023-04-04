@@ -24,8 +24,13 @@ class TransformerLayer(nn.Module):
         with_scale = bool(1 - args.remove_attention_scale)
 
         # Multi-headed self-attention.
+        lora_params = None
+        if hasattr(args, "lora_params"):
+            lora_params = args.lora_params
+
         self.self_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias, with_scale = with_scale
+            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+            with_scale = with_scale, lora_params=lora_params
         )
         self.dropout_1 = nn.Dropout(args.dropout)
 
@@ -91,14 +96,20 @@ class TransformerDecoderLayer(nn.Module):
         with_scale = bool(1 - args.remove_attention_scale)
 
         # Multi-headed self-attention.
+        lora_params = None
+        if hasattr(args, "lora_params"):
+            lora_params = args.lora_params
+
         self.self_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias, with_scale=with_scale
+            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+            with_scale=with_scale, lora_params=lora_params
         )
         self.dropout_1 = nn.Dropout(args.dropout)
 
         # Multi-headed context-attention.
         self.context_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias, with_scale=with_scale
+            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+            with_scale=with_scale, lora_params=lora_params
         )
         self.dropout_2 = nn.Dropout(args.dropout)
 
