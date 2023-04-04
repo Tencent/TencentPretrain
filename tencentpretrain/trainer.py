@@ -34,7 +34,7 @@ def train_and_validate(args):
     if args.pretrained_model_path is not None:
         # Initialize with pretrained model.
         if args.deepspeed and args.enable_zero3:
-            model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path)
+            model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path, args.lora_pretrained_model_path)
         else:
             model_for_training = load_model(model_for_training, args.pretrained_model_path,
                                         args.lora_pretrained_model_path)
