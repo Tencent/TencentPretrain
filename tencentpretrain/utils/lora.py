@@ -188,7 +188,7 @@ class LoraLinear(nn.Linear, LoRALayer):
             self.merged = True
 
     def forward(self, x: torch.Tensor):
-        return F.linear(x, self.weight, self.bias)
+        #return F.linear(x, self.weight, self.bias)
         def T(w):
             return w.T if self.fan_in_fan_out else w
         if self.r > 0 and not self.merged:
