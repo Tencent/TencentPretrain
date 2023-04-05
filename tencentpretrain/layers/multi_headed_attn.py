@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 from tencentpretrain.utils.rope import apply_rotary_emb
-
+from tencentpretrain.utils.lora import LoraLinear
 
 class MultiHeadedAttention(nn.Module):
     """
@@ -20,13 +20,12 @@ class MultiHeadedAttention(nn.Module):
         self.inner_hidden_size = heads_num * attention_head_size
 
         if lora_params is not None:
-            import loralib as lora
             self.linear_layers = nn.ModuleList(
-                [lora.Linear(hidden_size, self.inner_hidden_size, r=lora_params['lora_r'],
+                [LoraLinear(hidden_size, self.inner_hidden_size, r=lora_params['lora_r'],
                              lora_alpha=lora_params['lora_alpha'],
                              lora_dropout=lora_params['lora_dropout'], bias=has_bias),
                  nn.Linear(hidden_size, self.inner_hidden_size, bias=has_bias),
-                 lora.Linear(hidden_size, self.inner_hidden_size, r=lora_params['lora_r'],
+                 LoraLinear(hidden_size, self.inner_hidden_size, r=lora_params['lora_r'],
                              lora_alpha=lora_params['lora_alpha'],
                              lora_dropout=lora_params['lora_dropout'], bias=has_bias)]
             )
