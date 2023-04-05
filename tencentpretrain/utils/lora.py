@@ -189,12 +189,12 @@ class LoraLinear(nn.Linear, LoRALayer):
 
     def forward(self, x: torch.Tensor):
         if self.r > 0 and not self.merged:
-            result = F.linear(x, self.weight.T, bias=self.bias)
+            result = F.linear(x, self.weight, bias=self.bias)
             if self.r > 0:
                 result += (self.lora_dropout(x) @ self.lora_A.T @ self.lora_B.T) * self.scaling
             return result
         else:
-            return F.linear(x, self.weight.T, bias=self.bias)
+            return F.linear(x, self.weight, bias=self.bias)
 
 
 class MergedLinear(nn.Linear, LoRALayer):
