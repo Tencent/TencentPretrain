@@ -188,14 +188,15 @@ class LoraLinear(nn.Linear, LoRALayer):
             self.merged = True
 
     def forward(self, x: torch.Tensor):
+        def T(w):
+            return w.T if self.fan_in_fan_out else w
         if self.r > 0 and not self.merged:
-            result = x.matmul(self.weight.t()) + self.bias
+            result = x @ T(self.weight.T) + self.bias
             if self.r > 0:
                 result += (self.lora_dropout(x) @ self.lora_A.T @ self.lora_B.T) * self.scaling
             return result
         else:
-            return F.linear(x, self.weight, bias=self.bias)
-
+            return F.linear(x, T(self.weight), bias=self.bias)
 
 class MergedLinear(nn.Linear, LoRALayer):
     # LoRA implemented in a dense layer
