@@ -12,6 +12,7 @@ def save_model(model, model_path, use_lora=False):
         else:
             torch.save(model.module.state_dict(), model_path)
     else:
-        if use_lora:            torch.save(lora_state_dict(model), model_path)
+        if use_lora:
+            torch.save(lora_state_dict(model), model_path)
         else:
             torch.save(model.state_dict(), model_path)

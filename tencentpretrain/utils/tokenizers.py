@@ -39,7 +39,6 @@ class Tokenizer(object):
     def tokenize(self, text):
         raise NotImplementedError
 
-
     def convert_tokens_to_ids(self, tokens):
         if self.sp_model:
             return [self.sp_model.PieceToId(
