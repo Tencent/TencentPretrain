@@ -20,6 +20,7 @@ class MultiHeadedAttention(nn.Module):
         self.inner_hidden_size = heads_num * attention_head_size
 
         if lora_params is not None:
+
             self.linear_layers = nn.ModuleList(
                 [LoraLinear(hidden_size, self.inner_hidden_size, r=lora_params['lora_r'],
                              lora_alpha=lora_params['lora_alpha'],
