@@ -191,7 +191,9 @@ class LoraLinear(nn.Linear, LoRALayer):
         def T(w):
             return w.T if self.fan_in_fan_out else w
         if self.r > 0 and not self.merged:
-            result = x @ T(self.weight.T) + self.bias
+            result = x @ T(self.weight.T)
+            if self.bias is not None:
+                result += self.bias
             if self.r > 0:
                 result += (self.lora_dropout(x) @ self.lora_A.T @ self.lora_B.T) * self.scaling
             return result
