@@ -75,11 +75,10 @@ if __name__ == '__main__':
             seg_tensor = torch.cat([seg_tensor, torch.tensor([[1]]).to(device)], dim=1)
         if rank == 0:
             f.write(line + "\n")
-            generated_sentence = "".join(
-                args.tokenizer.convert_ids_to_tokens([token_id.item() for token_id in src_tensor[0]])
-            )
+            tokens = [token_id.item() for token_id in src_tensor[0]]
+            if args.tokenize.sp_model is not None:
+                generated_sentence = args.tokenizer.sp_model.decode(tokens)
+            else:
+                generated_sentence = "".join(args.tokenizer.convert_ids_to_tokens(tokens))
+
             f.write(generated_sentence)
-
-            print(args.tokenizer.decode([token_id.item() for token_id in src_tensor[0]]) + '\n')
-            print(src_tensor[0])
-
