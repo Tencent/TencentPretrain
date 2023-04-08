@@ -15,7 +15,7 @@ from tencentpretrain.utils.constants import *
 from tencentpretrain.utils import *
 from tencentpretrain.utils.config import load_hyperparam
 from tencentpretrain.utils.seed import set_seed
-from tencentpretrain.model_loader import load_model
+from tencentpretrain.model_loader import *
 from tencentpretrain.opts import infer_opts, tokenizer_opts
 from finetune.run_classifier import Classifier
 

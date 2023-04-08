@@ -6,6 +6,7 @@ Pre-training has become an essential part of AI technology. TencentPretrain is a
 
 #### **Full Documentation：https://github.com/Tencent/TencentPretrain/wiki**
 
++ **News 2023.04.07:** Add Low-Rank Adaptation (LoRA) and Deepspeed Zero 3 support [tutorial](./documents/lora.md)
 + **News 2023.03.10:** Add LLaMA model training / inference [tutorial ](./documents/llama.md), [中文博客](https://zhuanlan.zhihu.com/p/612752963)
 
 <br>

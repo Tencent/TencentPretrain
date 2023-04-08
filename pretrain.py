@@ -71,10 +71,23 @@ def main():
     # Deepspeed options.
     deepspeed_opts(parser)
 
+    # lora options.
+    lora_opts(parser)
+
     # Log options.
     log_opts(parser)
 
     args = parser.parse_args()
+
+    # construct lora dict parameters.
+    if args.use_lora:
+        args.lora_params = {
+            "lora_r": args.lora_r,
+            "lora_alpha": args.lora_alpha,
+            "lora_dropout": args.lora_dropout
+        }
+    else:
+        args.lora_params = None
 
     if "cls" in args.target:
         assert args.labels_num is not None, "Cls target needs the denotation of the number of labels."

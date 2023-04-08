@@ -34,7 +34,6 @@ def main():
     parser.add_argument("--output_prob", action="store_true", help="Write probabilities to output file.")
 
     deepspeed_opts(parser)
-    parser.add_argument("--mp_size", type=int, default=1, help="Model parallel size.")
 
     args = parser.parse_args()
 
@@ -47,48 +46,51 @@ def main():
     # Build classification model and load parameters.
     args.soft_targets, args.soft_alpha = False, False
     deepspeed.init_distributed()
-    model = Classifier(args)
-
-    if args.load_model_path:
+    if args.enable_zero3:
+        with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
+            model = Classifier(args)
+            model = _load_state_dict_into_model(model, args.load_model_path)
+    else:
+        model = Classifier(args)
         model = load_model(model, args.load_model_path)
 
-    model = deepspeed.init_inference(model=model, mp_size=args.mp_size, replace_method=None)
+    model = deepspeed.initialize(model=model,config_params=args.deepspeed_config)[0]
 
     rank = dist.get_rank()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    if rank == 0:
-        dataset = read_dataset(args, args.test_path)
+    dataset = read_dataset(args, args.test_path)
 
-        src = torch.LongTensor([sample[0] for sample in dataset])
-        seg = torch.LongTensor([sample[1] for sample in dataset])
+    src = torch.LongTensor([sample[0] for sample in dataset])
+    seg = torch.LongTensor([sample[1] for sample in dataset])
 
-        batch_size = args.batch_size
-        instances_num = src.size()[0]
+    batch_size = args.batch_size
+    instances_num = src.size()[0]
 
-        print("The number of prediction instances: ", instances_num)
+    print("The number of prediction instances: ", instances_num)
 
-        model.eval()
+    model.eval()
 
-        with open(args.prediction_path, mode="w", encoding="utf-8") as f:
+    with open(args.prediction_path, mode="w", encoding="utf-8") as f:
+        if rank == 0:
             f.write("label")
             if args.output_logits:
                 f.write("\t" + "logits")
             if args.output_prob:
                 f.write("\t" + "prob")
             f.write("\n")
-            for i, (src_batch, seg_batch) in enumerate(batch_loader(batch_size, src, seg)):
-                src_batch = src_batch.to(device)
-                seg_batch = seg_batch.to(device)
-                with torch.no_grad():
-                    _, logits = model(src_batch, None, seg_batch)
+        for i, (src_batch, seg_batch) in enumerate(batch_loader(batch_size, src, seg)):
+            src_batch = src_batch.to(device)
+            seg_batch = seg_batch.to(device)
+            with torch.no_grad():
+                _, logits = model(src_batch, None, seg_batch)
 
-                pred = torch.argmax(logits, dim=1)
-                pred = pred.cpu().numpy().tolist()
-                prob = nn.Softmax(dim=1)(logits)
-                logits = logits.cpu().numpy().tolist()
-                prob = prob.cpu().numpy().tolist()
-
+            pred = torch.argmax(logits, dim=1)
+            pred = pred.cpu().numpy().tolist()
+            prob = nn.Softmax(dim=1)(logits)
+            logits = logits.cpu().numpy().tolist()
+            prob = prob.cpu().numpy().tolist()
+            if rank == 0:
                 for j in range(len(pred)):
                     f.write(str(pred[j]))
                     if args.output_logits:

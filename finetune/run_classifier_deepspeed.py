@@ -14,6 +14,7 @@ tencentpretrain_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".
 sys.path.append(tencentpretrain_dir)
 
 from tencentpretrain.opts import deepspeed_opts
+from tencentpretrain.model_loader import *
 from finetune.run_classifier import *
 
 
@@ -129,10 +130,16 @@ def main():
     args.tokenizer = str2tokenizer[args.tokenizer](args)
 
     # Build classification model.
-    model = Classifier(args)
+    if args.enable_zero3:
+        with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
+            model = Classifier(args)
+            if args.pretrained_model_path:
+                model = _load_state_dict_into_model(model, args.load_model_path)
+    else:
+        model = Classifier(args)
 
-    # Load or initialize parameters.
-    load_or_initialize_parameters(args, model)
+        # Load or initialize parameters.
+        load_or_initialize_parameters(args, model)
 
     # Get logger.
     args.logger = init_logger(args)
