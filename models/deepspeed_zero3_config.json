@@ -5,12 +5,12 @@
   "optimizer": {
     "type": "Adam",
     "params": {
-      "lr": 2e-5,
+      "lr": 1e-5,
       "weight_decay": 1e-2
     }
   },
   "flops_profiler": {
-    "enabled": false,
+    "enabled": true,
     "profile_step": 1,
     "module_depth": -1,
     "top_modules": 3,
@@ -24,22 +24,21 @@
     "min_loss_scale": 1
   },
   "zero_optimization": {
-    "stage": 2,
-    "offload_param": {
-      "device": "cpu",
-      "pin_memory": true
-    },
-    "offload_optimizer": {
-      "device": "cpu",
-      "pin_memory": true
-    }
+      "stage": 3,
+      "offload_param": {
+          "device": "cpu",
+          "pin_memory": true
+      },
+      "offload_optimizer": {
+          "device": "cpu",
+          "pin_memory": true
+      }
   },
   "activation_checkpointing": {
-    "partition_activations": false,
-    "contiguous_memory_optimization": false,
-    "cpu_checkpointing": false
+      "partition_activations": false,
+      "contiguous_memory_optimization": false,
+      "cpu_checkpointing": false
   },
   "wall_clock_breakdown": false,
-  "zero_allow_untested_optimizer": true,
-  "zero_force_ds_cpu_optimization": false
+  "zero_allow_untested_optimizer": true
 }

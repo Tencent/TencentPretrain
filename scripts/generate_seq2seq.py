@@ -14,7 +14,7 @@ from tencentpretrain.targets import *
 from tencentpretrain.utils.constants import *
 from tencentpretrain.utils import *
 from tencentpretrain.utils.config import load_hyperparam
-from tencentpretrain.model_loader import load_model
+from tencentpretrain.model_loader import *
 from tencentpretrain.opts import infer_opts, tokenizer_opts
 from scripts.generate_lm import top_k_top_p_filtering
 

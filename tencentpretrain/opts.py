@@ -208,6 +208,8 @@ def tgt_tokenizer_opts(parser):
 def deepspeed_opts(parser):
     parser.add_argument("--deepspeed", action="store_true",
                         help=".")
+    parser.add_argument("--enable_zero3", action="store_true",
+                        help=".")
     parser.add_argument("--deepspeed_config", default="models/deepspeed_config.json", type=str,
                         help=".")
     parser.add_argument("--deepspeed_checkpoint_activations", action='store_true',
@@ -230,3 +232,15 @@ def adv_opts(parser):
                         help="Epsilon for PGD.")
     parser.add_argument("--pgd_alpha", type=float, default=0.3,
                         help="Alpha for PGD.")
+
+def lora_opts(parser):
+    parser.add_argument("--use_lora", action="store_true",
+                        help=".")
+    parser.add_argument("--lora_pretrained_model_path", type=str, default=None,
+                        help="Path of the lora pretrained model.")
+    parser.add_argument("--lora_r", type=int, default=8,
+                        help="The parameter of lora - r.")
+    parser.add_argument("--lora_alpha", type=int, default=16,
+                        help="The parameter of lora - alpha.")
+    parser.add_argument("--lora_dropout", type=float, default=0.0,
+                        help="The parameter of lora - dropout.")
