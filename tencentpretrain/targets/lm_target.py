@@ -25,13 +25,14 @@ class LmTarget(nn.Module):
         self.softmax = nn.LogSoftmax(dim=-1)
         self.criterion = nn.NLLLoss()
 
-    def lm(self, memory_bank, tgt_lm):
+    def lm(self, memory_bank, tgt_lm, seg):
         # Language modeling (LM) with full softmax prediction.
 
         tgt_lm = tgt_lm.contiguous().view(-1)
+        seg = seg.contiguous().view(-1)
         memory_bank = memory_bank.contiguous().view(-1, self.hidden_size)
-        memory_bank = memory_bank[tgt_lm > 0, :]
-        tgt_lm = tgt_lm[tgt_lm > 0]
+        memory_bank = memory_bank[seg > 0, :]
+        tgt_lm = tgt_lm[seg > 0]
         output = self.output_layer(memory_bank)
         output = self.softmax(output)
         denominator = torch.tensor(output.size(0) + 1e-6)
@@ -72,6 +73,6 @@ class LmTarget(nn.Module):
             denominator: Number of predicted words.
         """
         # Language modeling (LM) with full softmax prediction.
-        loss, correct, denominator = self.lm(memory_bank, tgt)
+        loss, correct, denominator = self.lm(memory_bank, tgt, seg)
 
         return loss, correct, denominator
