@@ -212,7 +212,7 @@ def main():
     if args.test_path is not None and args.rank == 0:
         args.logger.info("Test set evaluation.")
         model.load_checkpoint(args.output_model_path, str(best_epoch))
-        evaluate(args, read_dataset(args, args.test_path, split=False), True)
+        evaluate(args, read_dataset(args, args.test_path, split=False))
 
 
 if __name__ == "__main__":
