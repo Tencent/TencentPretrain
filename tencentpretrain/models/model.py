@@ -36,6 +36,9 @@ class Model(nn.Module):
             tgt_emb = self.tgt_embedding(tgt_in, tgt_seg)
             memory_bank = self.decoder(memory_bank, tgt_emb, (seg, tgt_seg))
 
-        loss_info = self.target(memory_bank, tgt, seg)
+        if tgt_seg is not None:
+            loss_info = self.target(memory_bank, tgt, tgt_seg)
+        else:
+            loss_info = self.target(memory_bank, tgt, seg)
 
         return loss_info
