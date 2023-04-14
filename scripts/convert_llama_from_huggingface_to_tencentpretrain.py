@@ -10,13 +10,13 @@ parser.add_argument("--input_model_path", type=str, default="models/llama-7b/",
                     help=".")
 parser.add_argument("--output_model_path", type=str, default="models/llama-7b.bin",
                     help=".")
-parser.add_argument("--type", choices=["7B", "13B", "30B", "65B"], default="7B")
+parser.add_argument("--type", choices=["7B", "13B", "33B", "65B"], default="7B")
 
 args = parser.parse_args()
 
 model_config = {"7B" : [32, 4096, 32],
               "13B": [40, 5120, 40],
-              "30B": [60, 6656, 52],
+              "33B": [60, 6656, 52],
               "65B": [80, 8192, 64]
               }
 
