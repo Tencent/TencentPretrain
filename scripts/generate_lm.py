@@ -110,7 +110,7 @@ if __name__ == '__main__':
 
         f.write(line + "\n")
         tokens = [token_id.item() for token_id in src_tensor[0]]
-        if args.tokenize.sp_model is not None:
+        if args.tokenizer.sp_model is not None:
             generated_sentence = args.tokenizer.sp_model.decode(tokens)
         else:
             generated_sentence = "".join(args.tokenizer.convert_ids_to_tokens(tokens))
