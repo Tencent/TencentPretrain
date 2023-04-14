@@ -89,7 +89,7 @@ if __name__ == '__main__':
     model.eval()
 
     # 输入
-    input = ""
+    input_str = "User: "
 
     print("欢迎使用ChatLLaMA！")
     print("您可以输入任意文本，ChatLLaMA会回复您所输入的内容。")
@@ -107,10 +107,18 @@ if __name__ == '__main__':
         if user_input == "exit":
             print("ChatLLaMA: Goodbye!")
             break
-        input += user_input
+
+        # 当用户输入exit时退出
+        if user_input == "clear":
+            print("ChatLLaMA: Clear the history input.")
+            input_str = "User: "
+            continue
+            
+        
+        input_str += user_input + "\n ChatLLaMA: "
         
         # 处理输入
-        args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(input))
+        args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(input_str))
         seg = [1] * len(src)
         beginning_length = len(src)
         if len(src) > args.seq_length:
@@ -134,10 +142,11 @@ if __name__ == '__main__':
         else:
             generated_sentence = "".join(args.tokenizer.convert_ids_to_tokens(tokens))
 
-        # 将程序输出加入input，作为下一轮的输入
-        input += generated_sentence
-
         print("ChatLLaMA: " + generated_sentence)
+
+        # 将程序输出加入input，作为下一轮的输入
+        input_str += generated_sentence + "\nUser: "
+
     
     print("Thank you for ChatLLaMA")
 
