@@ -5,7 +5,7 @@
   "hidden_act": "silu",
   "heads_num": 64,
   "layers_num": 80,
-  "dropout": 0.1,
+  "dropout": 0.0,
   "data_processor": "lm",
   "max_seq_length": 2048,
   "embedding": ["word"],
