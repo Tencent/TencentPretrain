@@ -32,6 +32,8 @@ def model_opts(parser):
                         help="Remove bias on transformer layers.")
     parser.add_argument("--layernorm", choices=["normal", "t5"], default="normal",
                         help="Layernorm type.")
+    parser.add_argument("--eps", type=float, default=1e-6,
+                        help="eps of layer norm.")
     parser.add_argument("--bidirectional", action="store_true", help="Specific to recurrent model.")
     parser.add_argument("--parameter_sharing", action="store_true", help="Parameter sharing.")
     parser.add_argument("--has_residual_attention", action="store_true", help="Add residual attention.")
@@ -43,6 +45,10 @@ def model_opts(parser):
                         help="Tie the word embedding and softmax weights.")
     parser.add_argument("--pooling", choices=["mean", "max", "first", "last"], default="first",
                         help="Pooling type.")
+    parser.add_argument("--alibi_position_embedding", action="store_true",
+                        help="whether use alibi position embedding.")
+    parser.add_argument("--layer_number_scale", action="store_true",
+                        help="whether use layer number scaling.")
 
     vision_opts(parser)
     audio_opts(parser)

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from tencentpretrain.utils.rope import precompute_freqs_cis
+from tencentpretrain.utils.alibi import build_alibi_tensor
 from tencentpretrain.layers.transformer import TransformerLayer
 from tencentpretrain.layers.layer_norm import *
 from tencentpretrain.layers.relative_position_embedding import RelativePositionEmbedding
@@ -13,11 +14,13 @@ class TransformerEncoder(nn.Module):
         super(TransformerEncoder, self).__init__()
         self.mask = args.mask
         self.layers_num = args.layers_num
+        self.heads_num = args.heads_num
         self.parameter_sharing = args.parameter_sharing
         self.factorized_embedding_parameterization = args.factorized_embedding_parameterization
         self.layernorm_positioning = args.layernorm_positioning
         self.relative_position_embedding = args.relative_position_embedding
         self.rotary_position_embedding = args.rotary_position_embedding
+        self.alibi_position_embedding = args.alibi_position_embedding
         self.has_residual_attention = args.has_residual_attention
         if "deepspeed_checkpoint_activations" in args:
             self.deepspeed_checkpoint_activations = args.deepspeed_checkpoint_activations
@@ -34,15 +37,16 @@ class TransformerEncoder(nn.Module):
             self.transformer = TransformerLayer(args)
         else:
             self.transformer = nn.ModuleList(
-                [TransformerLayer(args) for _ in range(self.layers_num)]
+                [TransformerLayer(args, i if args.layer_number_scale or args.alibi_position_embedding else None)
+                 for i in range(self.layers_num)]
             )
         if self.layernorm_positioning == "pre":
             if args.layernorm == "t5":
-                self.layer_norm = T5LayerNorm(args.hidden_size)
+                self.layer_norm = T5LayerNorm(args.hidden_size, args.eps)
             elif args.layernorm == "rms":
-                self.layer_norm = RMSNorm(args.hidden_size)
+                self.layer_norm = RMSNorm(args.hidden_size, args.eps)
             else:
-                self.layer_norm = LayerNorm(args.hidden_size)
+                self.layer_norm = LayerNorm(args.hidden_size, args.eps)
 
         if self.relative_position_embedding:
             self.relative_pos_emb = RelativePositionEmbedding(bidirectional=True, heads_num=args.heads_num,
@@ -107,6 +111,12 @@ class TransformerEncoder(nn.Module):
         else:
             freqs_cis = None
 
+        if self.alibi_position_embedding:
+            attention_mask = torch.ones((batch_size, seq_length), device=hidden.device)
+            alibi = build_alibi_tensor(attention_mask, self.heads_num, hidden.dtype, hidden.device)
+        else:
+            alibi = None
+
         prev_attn = None
 
         if self.deepspeed_checkpoint_activations:
@@ -119,11 +129,11 @@ class TransformerEncoder(nn.Module):
                         if self.parameter_sharing:
                             x_, y_ = self.transformer(x_, mask, position_bias=position_bias_,
                                                              has_residual_attention=self.has_residual_attention,
-                                                             prev_attn=y_, freqs_cis=freqs_cis_)
+                                                             prev_attn=y_, freqs_cis=freqs_cis_, alibi=alibi)
                         else:
                             x_, y_ = self.transformer[index](x_, mask, position_bias=position_bias_,
                                                              has_residual_attention=self.has_residual_attention,
-                                                             prev_attn=y_, freqs_cis=freqs_cis_)
+                                                             prev_attn=y_, freqs_cis=freqs_cis_, alibi=alibi)
                     return x_, y_
 
                 return custom_forward
@@ -137,11 +147,11 @@ class TransformerEncoder(nn.Module):
                 if self.parameter_sharing:
                     hidden, prev_attn = self.transformer(hidden, mask, position_bias=position_bias,
                                                          has_residual_attention=self.has_residual_attention,
-                                                         prev_attn=prev_attn, freqs_cis=freqs_cis)
+                                                         prev_attn=prev_attn, freqs_cis=freqs_cis, alibi=alibi)
                 else:
                     hidden, prev_attn = self.transformer[i](hidden, mask, position_bias=position_bias,
                                                             has_residual_attention=self.has_residual_attention,
-                                                            prev_attn=prev_attn, freqs_cis=freqs_cis)
+                                                            prev_attn=prev_attn, freqs_cis=freqs_cis, alibi=alibi)
 
         if self.layernorm_positioning == "pre":
             return self.layer_norm(hidden)

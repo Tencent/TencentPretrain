@@ -11,7 +11,7 @@ class MultiHeadedAttention(nn.Module):
     """
 
     def __init__(self, hidden_size, heads_num, attention_head_size, dropout, has_bias=True, with_scale=True,
-                 lora_params=None):
+                 lora_params=None, layer_number=None):
         super(MultiHeadedAttention, self).__init__()
         self.heads_num = heads_num
 
@@ -36,9 +36,13 @@ class MultiHeadedAttention(nn.Module):
             )
         self.dropout = nn.Dropout(dropout)
         self.final_linear = nn.Linear(self.inner_hidden_size, hidden_size, bias=has_bias)
+        # layer-wise attention scaling
+        if layer_number is not None:
+            self.layer_number = max(1, layer_number)
+            self.norm_factor = math.sqrt(self.per_head_size) * self.layer_number
 
     def forward(self, key, value, query, mask, position_bias=None, has_residual_attention=False, prev_attn=None,
-                freqs_cis=None):
+                freqs_cis=None, alibi=None):
         """
         Args:
             key: [batch_size x seq_length x hidden_size]
@@ -76,8 +80,22 @@ class MultiHeadedAttention(nn.Module):
         if position_bias is not None:
             scores = scores + position_bias
         if self.with_scale:
-            scores = scores / math.sqrt(float(per_head_size))
+            if self.layer_number is not None:
+                scores = scores * (1.0 / self.norm_factor)
+            else:
+                scores = scores / math.sqrt(float(per_head_size))
+        if alibi is not None:
+            scores = scores.reshape((-1, scores.shape[-2], scores.shape[-1]))
+            scores += (1.0 / self.layer_number) * alibi
+            scores = scores.view(-1, heads_num, scores.shape[-2], scores.shape[-1])
+
         scores = scores + mask.type_as(scores)
+
+        # scaled softmax
+        if self.layer_number is not None:
+            scores = (scores * self.layer_number) + mask
+            scores = torch.max(scores, torch.tensor(-10000))
+
         prev_attn_out = None
         if has_residual_attention:
             if prev_attn is not None:
