@@ -16,7 +16,7 @@ def load_model(model, model_path, lora_pretrained_model_path=None):
     return model
 
 
-def _load_state_dict_into_model(model_to_load, model_path, start_prefix="", lora_pretrained_model_path=None):
+def _load_state_dict_into_model(model_to_load, model_path, start_prefix=""):
     # Convert old format to new format if needed from a PyTorch state_dict
 
     # copy state_dict so _load_from_state_dict can modify it
@@ -25,14 +25,6 @@ def _load_state_dict_into_model(model_to_load, model_path, start_prefix="", lora
     state_dict = state_dict.copy()
     if metadata is not None:
         state_dict._metadata = metadata
-
-    if lora_pretrained_model_path is not None:
-        lora_state_dict = torch.load(lora_pretrained_model_path, map_location="cpu")
-        lora_metadata = getattr(lora_state_dict, "_metadata", None)
-        lora_state_dict = lora_state_dict.copy()
-        if lora_metadata is not None:
-            lora_state_dict._metadata = lora_metadata
-
     error_msgs = []
 
     # PyTorch's `_load_from_state_dict` does not copy parameters in a module's descendants
@@ -61,9 +53,6 @@ def _load_state_dict_into_model(model_to_load, model_path, start_prefix="", lora
                 load(child, state_dict, prefix + name + ".")
 
     load(model_to_load, state_dict, prefix=start_prefix)
-    if lora_pretrained_model_path is not None:
-        load(model_to_load, lora_state_dict, prefix=start_prefix)
-        del lora_state_dict
     # Delete `state_dict` so it could be collected by GC earlier. Note that `state_dict` is a copy of the argument, so
     # it's safe to delete it.
     del state_dict
