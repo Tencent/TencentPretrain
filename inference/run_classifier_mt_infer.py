@@ -50,12 +50,11 @@ class MultitaskClassifier(nn.Module):
         memory_bank = self.encoder(emb, seg)
         # Target.
         memory_bank = pooling(memory_bank, seg, self.pooling_type)
-        output = torch.tanh(self.output_layers_1[0](memory_bank))
-        logits = self.output_layers_2[0](output).unsqueeze(1)
-        for i in range(1, len(self.output_layers_1)):
-            output_tmp = torch.tanh(self.output_layers_1[i](memory_bank))
-            logits_tmp = self.output_layers_2[i](output_tmp).unsqueeze(1)
-            logits = torch.cat((logits, logits_tmp), 1)
+        logits = []
+        for i in range(len(self.output_layers_1)):
+            output_i = torch.tanh(self.output_layers_1[i](memory_bank))
+            logits_i = self.output_layers_2[i](output_i)
+            logits.append(logits_i)
         
         return None, logits
 
@@ -146,7 +145,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     if torch.cuda.device_count() > 1:
-        args.logger.info("{} GPUs are available. Let's use them.".format(torch.cuda.device_count()))
+        args.logger.info("{0} GPUs are available. Let's use them.".format(torch.cuda.device_count()))
         model = torch.nn.DataParallel(model)
 
     dataset = read_dataset(args, args.test_path)
@@ -157,7 +156,7 @@ def main():
     batch_size = args.batch_size
     instances_num = src.size()[0]
 
-    args.logger.info("The number of prediction instances: {}".format(instances_num))
+    args.logger.info("The number of prediction instances: {0}".format(instances_num))
 
     model.eval()
 
@@ -177,20 +176,23 @@ def main():
             with torch.no_grad():
                 _, logits = model(src_batch, None, seg_batch)
 
-            pred = torch.argmax(logits, dim=-1)
-            prob = nn.Softmax(dim=-1)(logits)
+            pred = [torch.argmax(logits_i, dim=-1) for logits_i in logits]
+            prob = [nn.Softmax(dim=-1)(logits_i) for logits_i in logits]
 
-            logits = logits.cpu().numpy().tolist()
-            pred = pred.cpu().numpy().tolist()
-            prob = prob.cpu().numpy().tolist()
+            logits = [x.cpu().numpy().tolist() for x in logits]
+            pred = [x.cpu().numpy().tolist() for x in pred]
+            prob = [x.cpu().numpy().tolist() for x in prob]
 
-            for j in range(len(pred)):
-                f.write(" ".join([str(v) for v in pred[j]]))
+            for j in range(len(pred[0])):
+                f.write("|".join([str(v[j]) for v in pred]))
                 if args.output_logits:
-                    f.write("\t" + " ".join(["{0:.4f}".format(v[-1]) for v in logits[j]]))
+                    f.write("\t" + "|".join([" ".join(["{0:.4f}".format(w) for w in v[j]]) for v in logits]))
                 if args.output_prob:
-                    f.write("\t" + " ".join(["{0:.4f}".format(v[-1]) for v in prob[j]]))
+                    f.write("\t" + "|".join([" ".join(["{0:.4f}".format(w) for w in v[j]]) for v in prob]))
                 f.write("\n")
+        f.close()
+        args.logger.info("Done.")
+        args.logger.info("Saved in {0}".format(args.prediction_path))
 
 
 if __name__ == "__main__":
