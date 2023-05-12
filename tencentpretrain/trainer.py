@@ -1,3 +1,5 @@
+import os
+import json
 import time
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -34,7 +36,17 @@ def train_and_validate(args):
     if args.pretrained_model_path is not None:
         # Initialize with pretrained model.
         if args.deepspeed and args.enable_zero3:
-            model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path, "", args.lora_pretrained_model_path)
+            if os.path.isdir(args.pretrained_model_path):
+                index_filename = os.path.join(args.pretrained_model_path, 'pytorch_model.bin.index.json')
+                with open(index_filename, "r") as f:
+                    index = json.loads(f.read())
+                shard_filenames = sorted(set(index["weight_map"].values()))
+                shard_filenames = [os.path.join(args.pretrained_model_path, f) for f in shard_filenames]
+                for shard_file in shard_filenames:
+                    model_for_training = _load_state_dict_into_model(model_for_training, shard_file, "")
+            else:
+                model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path, "")
+                model_for_training = _load_state_dict_into_model(model_for_training, args.lora_pretrained_model_path, "")
         else:
             model_for_training = load_model(model_for_training, args.pretrained_model_path,
                                         args.lora_pretrained_model_path)
