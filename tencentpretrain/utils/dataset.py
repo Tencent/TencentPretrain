@@ -450,10 +450,8 @@ class LmDataset(Dataset):
             while True:
                 line = f.readline().strip()
                 if self.json_file:
-                    try:
-                        line = json.loads(line)["text"]
-                    except:
-                        continue
+                    line = json.loads(line)["text"]
+
                 pos += 1
 
                 document = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line))
