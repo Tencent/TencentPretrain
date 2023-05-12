@@ -35,8 +35,6 @@ class MultitaskClassifier(nn.Module):
         self.output_layers_1 = nn.ModuleList([nn.Linear(args.hidden_size, args.hidden_size) for _ in args.labels_num_list])
         self.output_layers_2 = nn.ModuleList([nn.Linear(args.hidden_size, labels_num) for labels_num in args.labels_num_list])
 
-        self.dataset_id = 0
-
     def forward(self, src, tgt, seg, soft_tgt=None):
         """
         Args:
