@@ -461,8 +461,6 @@ class LmDataset(Dataset):
                 if self.full_sentences:
                     buffer.extend(document)
                     instances_num = len(buffer) // (self.seq_length + 1)
-                    print(line)
-                    print(len(buffer), instances_num)
                     for i in range(instances_num):
                         src = buffer[i * (self.seq_length + 1): (i + 1) * (self.seq_length + 1)]
                         seg_pos = [self.seq_length]
@@ -485,8 +483,8 @@ class LmDataset(Dataset):
                         src = (src, pad_num)
                         pickle.dump((src, seg_pos), dataset_writer)
 
-                    if pos >= end:
-                        break
+                if pos >= end:
+                    break
 
         dataset_writer.close()
 
