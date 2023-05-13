@@ -35,7 +35,7 @@ class LmTarget(nn.Module):
 
         memory_bank = memory_bank.contiguous().view(-1, self.hidden_size)
 
-        loss_mask = 1 if self.args.prefix_lm_loss else 0
+        loss_mask = 1 if self.prefix_lm_loss else 0
         # For example seg=[1,1,1,2,2,0], when loss_prefix = 0 , parts of seg > 0 tokens are computed loss
         # when loss_prefix=1 , only parts of seg = 2 tokens are computed loss
         memory_bank = memory_bank[seg > loss_mask, :]
