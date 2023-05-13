@@ -21,7 +21,7 @@ class LmTarget(nn.Module):
             self.ignore_index = args.tokenizer.vocab.get(PAD_TOKEN)
         else:
             self.ignore_index = None
-        self.args.prefix_lm_loss = args.args.prefix_lm_loss
+        self.prefix_lm_loss = args.prefix_lm_loss
 
         self.output_layer = nn.Linear(self.hidden_size, self.vocab_size, bias=args.has_lmtarget_bias)
         self.softmax = nn.LogSoftmax(dim=-1)
