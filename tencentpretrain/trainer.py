@@ -164,10 +164,6 @@ class Trainer(object):
                 if self.current_step % self.save_checkpoint_steps == 0 and \
                         (not self.dist_train or (self.dist_train and rank == 0)):
                     save_model(model, self.output_model_path + "-" + str(self.current_step), args.use_lora)
-                    if loss.item() < self.best_loss:
-                        self.best_loss = loss.item()
-                        print("save best model! loss:" + str(self.best_loss))
-                        save_model(model, self.output_model_path + "-best", args.use_lora)
 
             self.current_step += 1
 

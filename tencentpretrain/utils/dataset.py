@@ -435,7 +435,7 @@ class LmDataset(Dataset):
     def __init__(self, args, vocab, tokenizer):
         super(LmDataset, self).__init__(args, vocab, tokenizer)
         self.full_sentences = args.full_sentences
-        self.json_file = args.json_file
+        self.json_format_corpus = args.json_format_corpus
 
     def worker(self, proc_id, start, end):
         print("Worker %d is building dataset ... " % proc_id)
@@ -449,7 +449,7 @@ class LmDataset(Dataset):
                 pos += 1
             while True:
                 line = f.readline().strip()
-                if self.json_file:
+                if self.json_format_corpus:
                     line = json.loads(line)["text"]
 
                 pos += 1
