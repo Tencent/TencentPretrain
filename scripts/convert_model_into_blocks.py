@@ -10,12 +10,17 @@ parser.add_argument("--input_model_path", type=str,
                     help="Input file path")
 parser.add_argument("--output_model_path", type=str,
                     help="Output folder path")
+parser.add_argument("--block_size", type=int, default=10,
+                    help="Disi size (GB) of each block.")
+
 
 args = parser.parse_args()
 
 os.system('mkdir ' + args.output_model_path)
 
 input_model = torch.load(args.input_model_path)
+
+byte_size = args.block_size * 500000000
 
 param_count, file_count, filename_count = 0, 0, 0
 index_dict = {"weight_map": {}}
@@ -27,7 +32,7 @@ for k, v in input_model.items():
     index_dict["weight_map"][k] = filename
     param_count += v.numel()
     file_count += v.numel()
-    if file_count > 2500000000:
+    if file_count > byte_size:
         torch.save(state_dict, os.path.join(args.output_model_path, filename))
         state_dict = collections.OrderedDict()
         filename_count += 1
