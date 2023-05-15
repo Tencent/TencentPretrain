@@ -432,35 +432,54 @@ class AlbertDataset(Dataset):
 
 
 class LmDataset(Dataset):
+    def __init__(self, args, vocab, tokenizer):
+        super(LmDataset, self).__init__(args, vocab, tokenizer)
+        self.full_sentences = args.full_sentences
+        self.json_format_corpus = args.json_format_corpus
+
     def worker(self, proc_id, start, end):
         print("Worker %d is building dataset ... " % proc_id)
         set_seed(self.seed)
         dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
         pos = 0
+        buffer = []
         with open(self.corpus_path, mode="r", encoding="utf-8") as f:
             while pos < start:
                 f.readline()
                 pos += 1
             while True:
-                line = f.readline()
+                line = f.readline().strip()
+                if self.json_format_corpus:
+                    line = json.loads(line)["text"]
+
                 pos += 1
 
-                document = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line.strip()))
+                document = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line))
                 document = [self.vocab.get(CLS_TOKEN)] + document + [self.vocab.get(SEP_TOKEN)]
+                if self.full_sentences:
+                    buffer.extend(document)
+                    instances_num = len(buffer) // (self.seq_length + 1)
+                    for i in range(instances_num):
+                        src = buffer[i * (self.seq_length + 1): (i + 1) * (self.seq_length + 1)]
+                        seg_pos = [self.seq_length]
+                        src = (src, 0)
+                        pickle.dump((src, seg_pos), dataset_writer)
+                    buffer = buffer[instances_num * (self.seq_length + 1): ]
 
-                instances_num = len(document) // (self.seq_length + 1)
-                for i in range(instances_num):
-                    src = document[i * (self.seq_length + 1): (i + 1) * (self.seq_length + 1)]
-                    seg_pos = [self.seq_length]
-                    src = (src, 0)
-                    pickle.dump((src, seg_pos), dataset_writer)
+                else:
+                    instances_num = len(document) // (self.seq_length + 1)
+                    for i in range(instances_num):
+                        src = document[i * (self.seq_length + 1): (i + 1) * (self.seq_length + 1)]
+                        seg_pos = [self.seq_length]
+                        src = (src, 0)
+                        pickle.dump((src, seg_pos), dataset_writer)
 
-                src = document[instances_num * (self.seq_length + 1):]
-                if len(src) > 0:
-                    seg_pos = [len(src)]
-                    pad_num = self.seq_length + 1 - len(src)
-                    src = (src, pad_num)
-                    pickle.dump((src, seg_pos), dataset_writer)
+                    src = document[instances_num * (self.seq_length + 1):]
+                    if len(src) > 0:
+                        seg_pos = [len(src)]
+                        pad_num = self.seq_length + 1 - len(src)
+                        src = (src, pad_num)
+                        pickle.dump((src, seg_pos), dataset_writer)
 
                 if pos >= end:
                     break
@@ -990,23 +1009,24 @@ class AlpacaDataset(Dataset):
                 instruction = data.get("instruction", "").replace('\\n', '\n')
                 input = data.get("input", "").replace('\\n', '\n')
                 output = data.get("output", "").replace('\\n', '\n')
-                line_text = instruction + input + output
-                document = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line_text))
-                document = [self.vocab.get(CLS_TOKEN)] + document + [self.vocab.get(SEP_TOKEN)]
 
-                instances_num = len(document) // (self.seq_length + 1)
-                for i in range(instances_num):
-                    src = document[i * (self.seq_length + 1): (i + 1) * (self.seq_length + 1)]
-                    seg_pos = [self.seq_length]
-                    src = (src, 0)
-                    pickle.dump((src, seg_pos), dataset_writer)
+                document_input = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(instruction + input))
+                document_output = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(output))
 
-                src = document[instances_num * (self.seq_length + 1):]
-                if len(src) > 0:
-                    seg_pos = [len(src)]
-                    pad_num = self.seq_length + 1 - len(src)
-                    src = (src, pad_num)
-                    pickle.dump((src, seg_pos), dataset_writer)
+                src = [self.vocab.get(CLS_TOKEN)] + document_input
+                seg_pos = [len(src)]
+                if len(src) > self.seq_length:
+                    continue
+                src.extend(document_output)
+                src.append(self.vocab.get(SEP_TOKEN))
+                src = src[:self.seq_length]
+                seg_pos.append(len(src))
+
+                pad_num = 0
+                if len(src) <= self.seq_length:
+                    pad_num = self.seq_length - len(src)
+
+                pickle.dump(((src, pad_num), seg_pos), dataset_writer)
                 if pos >= end:
                     break
 

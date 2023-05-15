@@ -16,6 +16,8 @@ def main():
                         help="Path of the corpus for pretraining.")
     parser.add_argument("--dataset_path", type=str, default="dataset.pt",
                         help="Path of the preprocessed dataset.")
+    parser.add_argument("--json_format_corpus", action="store_true",
+                        help="Load from a json file corpus, like {\"text\": \"text\"}.")
 
     # Preprocess options.
     tokenizer_opts(parser)
