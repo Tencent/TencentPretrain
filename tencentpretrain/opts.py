@@ -7,6 +7,8 @@ def model_opts(parser):
                         help="Max sequence length for word embedding.")
     parser.add_argument("--relative_position_embedding", action="store_true",
                         help="Use relative position embedding.")
+    parser.add_argument("--rotary_position_embedding", action="store_true",
+                        help="Use relative position embedding.")
     parser.add_argument("--share_embedding", action="store_true",
                         help="Shared embedding and target embedding parameters.")
     parser.add_argument("--remove_embedding_layernorm", action="store_true",
@@ -41,6 +43,8 @@ def model_opts(parser):
                         help="Tie the word embedding and softmax weights.")
     parser.add_argument("--pooling", choices=["mean", "max", "first", "last"], default="first",
                         help="Pooling type.")
+    parser.add_argument("--prefix_lm_loss", action="store_true",
+                        help="Only compute output loss when SFT.")
 
     vision_opts(parser)
     audio_opts(parser)
@@ -206,6 +210,8 @@ def tgt_tokenizer_opts(parser):
 def deepspeed_opts(parser):
     parser.add_argument("--deepspeed", action="store_true",
                         help=".")
+    parser.add_argument("--enable_zero3", action="store_true",
+                        help=".")
     parser.add_argument("--deepspeed_config", default="models/deepspeed_config.json", type=str,
                         help=".")
     parser.add_argument("--deepspeed_checkpoint_activations", action='store_true',
@@ -228,3 +234,15 @@ def adv_opts(parser):
                         help="Epsilon for PGD.")
     parser.add_argument("--pgd_alpha", type=float, default=0.3,
                         help="Alpha for PGD.")
+
+def lora_opts(parser):
+    parser.add_argument("--use_lora", action="store_true",
+                        help=".")
+    parser.add_argument("--lora_pretrained_model_path", type=str, default=None,
+                        help="Path of the lora pretrained model.")
+    parser.add_argument("--lora_r", type=int, default=8,
+                        help="The parameter of lora - r.")
+    parser.add_argument("--lora_alpha", type=int, default=16,
+                        help="The parameter of lora - alpha.")
+    parser.add_argument("--lora_dropout", type=float, default=0.0,
+                        help="The parameter of lora - dropout.")

@@ -1,5 +1,5 @@
 import torch.nn as nn
-from tencentpretrain.layers.layer_norm import LayerNorm, T5LayerNorm
+from tencentpretrain.layers.layer_norm import *
 from tencentpretrain.layers.position_ffn import PositionwiseFeedForward, GatedFeedForward
 from tencentpretrain.layers.multi_headed_attn import MultiHeadedAttention
 from tencentpretrain.layers.relative_position_embedding import RelativePositionEmbedding
@@ -24,8 +24,13 @@ class TransformerLayer(nn.Module):
         with_scale = bool(1 - args.remove_attention_scale)
 
         # Multi-headed self-attention.
+        lora_params = None
+        if hasattr(args, "lora_params"):
+            lora_params = args.lora_params
+
         self.self_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias, with_scale = with_scale
+            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+            with_scale = with_scale, lora_params=lora_params
         )
         self.dropout_1 = nn.Dropout(args.dropout)
 
@@ -43,11 +48,14 @@ class TransformerLayer(nn.Module):
         if args.layernorm == "t5":
             self.layer_norm_1 = T5LayerNorm(args.hidden_size)
             self.layer_norm_2 = T5LayerNorm(args.hidden_size)
+        elif args.layernorm == "rms":
+            self.layer_norm_1 = RMSNorm(args.hidden_size)
+            self.layer_norm_2 = RMSNorm(args.hidden_size)
         else:
             self.layer_norm_1 = LayerNorm(args.hidden_size)
             self.layer_norm_2 = LayerNorm(args.hidden_size)
 
-    def forward(self, hidden, mask, position_bias=None, has_residual_attention=False, prev_attn=None):
+    def forward(self, hidden, mask, position_bias=None, has_residual_attention=False, prev_attn=None, freqs_cis=None):
         """
         Args:
             hidden: [batch_size x seq_length x emb_size]
@@ -58,14 +66,14 @@ class TransformerLayer(nn.Module):
         """
 
         if self.layernorm_positioning == "post":
-            inter, prev_attn_out = self.self_attn(hidden, hidden, hidden, mask, position_bias, has_residual_attention, prev_attn)
+            inter, prev_attn_out = self.self_attn(hidden, hidden, hidden, mask, position_bias, has_residual_attention, prev_attn, freqs_cis)
             inter = self.dropout_1(inter)
             inter = self.layer_norm_1(inter + hidden)
             output = self.dropout_2(self.feed_forward(inter))
             output = self.layer_norm_2(output + inter)
         else:
             inter = self.layer_norm_1(hidden)
-            inter, prev_attn_out = self.self_attn(inter, inter, inter, mask, position_bias, has_residual_attention, prev_attn)
+            inter, prev_attn_out = self.self_attn(inter, inter, inter, mask, position_bias, has_residual_attention, prev_attn, freqs_cis)
             inter = self.dropout_1(inter)
             hidden = hidden + inter
             output = self.layer_norm_2(hidden)
@@ -88,14 +96,20 @@ class TransformerDecoderLayer(nn.Module):
         with_scale = bool(1 - args.remove_attention_scale)
 
         # Multi-headed self-attention.
+        lora_params = None
+        if hasattr(args, "lora_params"):
+            lora_params = args.lora_params
+
         self.self_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias, with_scale=with_scale
+            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+            with_scale=with_scale, lora_params=lora_params
         )
         self.dropout_1 = nn.Dropout(args.dropout)
 
         # Multi-headed context-attention.
         self.context_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias, with_scale=with_scale
+            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+            with_scale=with_scale, lora_params=lora_params
         )
         self.dropout_2 = nn.Dropout(args.dropout)
 

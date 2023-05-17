@@ -21,17 +21,26 @@ class LmTarget(nn.Module):
             self.ignore_index = args.tokenizer.vocab.get(PAD_TOKEN)
         else:
             self.ignore_index = None
+        self.prefix_lm_loss = args.prefix_lm_loss
+
         self.output_layer = nn.Linear(self.hidden_size, self.vocab_size, bias=args.has_lmtarget_bias)
         self.softmax = nn.LogSoftmax(dim=-1)
         self.criterion = nn.NLLLoss()
 
-    def lm(self, memory_bank, tgt_lm):
+    def lm(self, memory_bank, tgt_lm, seg):
         # Language modeling (LM) with full softmax prediction.
 
         tgt_lm = tgt_lm.contiguous().view(-1)
+        seg = seg.contiguous().view(-1)
+
         memory_bank = memory_bank.contiguous().view(-1, self.hidden_size)
-        memory_bank = memory_bank[tgt_lm > 0, :]
-        tgt_lm = tgt_lm[tgt_lm > 0]
+
+        loss_mask = 1 if self.prefix_lm_loss else 0
+        # For example seg=[1,1,1,2,2,0], when loss_prefix = 0 , parts of seg > 0 tokens are computed loss
+        # when loss_prefix=1 , only parts of seg = 2 tokens are computed loss
+        memory_bank = memory_bank[seg > loss_mask, :]
+        tgt_lm = tgt_lm[seg > loss_mask]
+
         output = self.output_layer(memory_bank)
         output = self.softmax(output)
         denominator = torch.tensor(output.size(0) + 1e-6)
@@ -72,6 +81,6 @@ class LmTarget(nn.Module):
             denominator: Number of predicted words.
         """
         # Language modeling (LM) with full softmax prediction.
-        loss, correct, denominator = self.lm(memory_bank, tgt)
+        loss, correct, denominator = self.lm(memory_bank, tgt, seg)
 
         return loss, correct, denominator
