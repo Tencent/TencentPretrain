@@ -37,7 +37,7 @@ def train_and_validate(args):
         # Initialize with pretrained model.
         if args.deepspeed and args.enable_zero3:
             if os.path.isdir(args.pretrained_model_path):
-                index_filename = os.path.join(args.pretrained_model_path, 'pytorch_model.bin.index.json')
+                index_filename = os.path.join(args.pretrained_model_path, "tencentpretrain_model.bin.index.json")
                 with open(index_filename, "r") as f:
                     index = json.loads(f.read())
                 shard_filenames = sorted(set(index["weight_map"].values()))
