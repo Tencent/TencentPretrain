@@ -1,0 +1,21 @@
+{
+  "emb_size": 4544,
+  "feedforward_size": 18176,
+  "hidden_size": 4544,
+  "hidden_act": "gelu",
+  "heads_num": 71,
+  "layers_num": 32,
+  "dropout": 0.0,
+  "data_processor": "lm",
+  "max_seq_length": 2048,
+  "embedding": ["word"],
+  "remove_transformer_bias": true,
+  "remove_embedding_layernorm": true,
+  "attention": "flash_attention",
+  "encoder": "transformer",
+  "mask": "causal",
+  "layernorm_positioning": "pre",
+  "layernorm": "normal_torch",
+  "layernorm_eps": 1e-5,
+  "target": ["lm"]
+}

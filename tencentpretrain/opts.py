@@ -17,6 +17,8 @@ def model_opts(parser):
     parser.add_argument("--encoder", choices=["transformer", "rnn", "lstm", "gru", "birnn",
                                               "bilstm", "bigru", "gatedcnn", "dual"],
                         default="transformer", help="Encoder type.")
+    parser.add_argument("--attention", choices=["multi_head", "flash_attention"],
+                        default="multi_head", help="Self-attention type.")
     parser.add_argument("--decoder", choices=[None, "transformer"], default=None, help="Decoder type.")
     parser.add_argument("--mask", choices=["fully_visible", "causal", "causal_with_prefix"], default="fully_visible",
                         help="Mask type.")
@@ -30,8 +32,10 @@ def model_opts(parser):
                         help="Remove attention scale.")
     parser.add_argument("--remove_transformer_bias", action="store_true",
                         help="Remove bias on transformer layers.")
-    parser.add_argument("--layernorm", choices=["normal", "t5"], default="normal",
+    parser.add_argument("--layernorm", choices=["normal", "t5", "rms", "normal_torch"], default="normal",
                         help="Layernorm type.")
+    parser.add_argument("--layernorm_eps", type=float, default=1e-6,
+                        help="Layernorm eps.")
     parser.add_argument("--bidirectional", action="store_true", help="Specific to recurrent model.")
     parser.add_argument("--parameter_sharing", action="store_true", help="Parameter sharing.")
     parser.add_argument("--has_residual_attention", action="store_true", help="Add residual attention.")

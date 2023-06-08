@@ -41,6 +41,8 @@ class TransformerEncoder(nn.Module):
                 self.layer_norm = T5LayerNorm(args.hidden_size)
             elif args.layernorm == "rms":
                 self.layer_norm = RMSNorm(args.hidden_size)
+            elif args.layernorm == "normal_torch":
+                self.layer_norm = nn.LayerNorm(args.hidden_size, eps=args.layernorm_eps)
             else:
                 self.layer_norm = LayerNorm(args.hidden_size)
 

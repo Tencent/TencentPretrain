@@ -1,8 +1,9 @@
 import torch.nn as nn
 from tencentpretrain.layers.layer_norm import *
 from tencentpretrain.layers.position_ffn import PositionwiseFeedForward, GatedFeedForward
-from tencentpretrain.layers.multi_headed_attn import MultiHeadedAttention
+from tencentpretrain.layers.multi_headed_attn import *
 from tencentpretrain.layers.relative_position_embedding import RelativePositionEmbedding
+
 
 
 class TransformerLayer(nn.Module):
@@ -28,10 +29,16 @@ class TransformerLayer(nn.Module):
         if hasattr(args, "lora_params"):
             lora_params = args.lora_params
 
-        self.self_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
-            with_scale = with_scale, lora_params=lora_params
-        )
+        if args.attention == "flash_attention":
+            self.self_attn = FlashAttention(
+                args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+                with_scale = with_scale, lora_params=lora_params
+            )
+        else:
+            self.self_attn = MultiHeadedAttention(
+                args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+                with_scale = with_scale, lora_params=lora_params
+            )
         self.dropout_1 = nn.Dropout(args.dropout)
 
         # Feed forward layer.
@@ -51,6 +58,9 @@ class TransformerLayer(nn.Module):
         elif args.layernorm == "rms":
             self.layer_norm_1 = RMSNorm(args.hidden_size)
             self.layer_norm_2 = RMSNorm(args.hidden_size)
+        elif args.layernorm == "normal_torch":
+            self.layer_norm_1 = nn.LayerNorm(args.hidden_size, eps=args.layernorm_eps)
+            self.layer_norm_2 = nn.LayerNorm(args.hidden_size, eps=args.layernorm_eps)
         else:
             self.layer_norm_1 = LayerNorm(args.hidden_size)
             self.layer_norm_2 = LayerNorm(args.hidden_size)
