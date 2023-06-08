@@ -122,7 +122,7 @@ class FlashAttention(nn.Module):
         self.attention_dropout = nn.Dropout(dropout)
         self.num_kv = 1
 
-    def _split_heads(self, fused_qkv: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _split_heads(self, fused_qkv: torch.Tensor):
         """
         Split the last dimension into (num_heads, head_dim) without making any copies, results share same memory
         storage as `fused_qkv`
@@ -141,7 +141,7 @@ class FlashAttention(nn.Module):
             fused_qkv = fused_qkv.view(batch_size, seq_length, self.num_heads + 2, self.head_dim)
             return fused_qkv[..., :-2, :], fused_qkv[..., [-2], :], fused_qkv[..., [-1], :]
 
-    def _merge_heads(self, x: torch.Tensor) -> torch.Tensor:
+    def _merge_heads(self, x: torch.Tensor):
         """
         Merge heads together over the last dimenstion
         Args:
