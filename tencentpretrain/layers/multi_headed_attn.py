@@ -106,6 +106,8 @@ class FlashAttention(nn.Module):
         self.head_dim = attention_head_size
         self.with_scale = with_scale
         self.inner_hidden_size = heads_num * attention_head_size
+        self.multi_query = True
+        
 
         self.rotary = RotaryEmbedding(self.head_dim)
         # Layer-wise attention scaling
