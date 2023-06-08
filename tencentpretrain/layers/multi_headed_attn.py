@@ -179,8 +179,6 @@ class FlashAttention(nn.Module):
         batch_size, seq_length, _ = query.size()
         fused_qkv = self.query_key_value(query)
 
-        per_head_size = self.per_head_size
-
         # 3 x [batch_size, seq_length, num_heads, head_dim]
         (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
 
