@@ -195,11 +195,11 @@ class FlashAttention(nn.Module):
 
 
         key_layer = key_layer.transpose(1, 2).reshape(
-            batch_size * self.num_heads,
+            batch_size * self.num_kv,
             q_length,
             self.head_dim,
             )
-        value_layer = value_layer.transpose(1, 2).reshape(batch_size * self.num_heads, q_length, self.head_dim)
+        value_layer = value_layer.transpose(1, 2).reshape(batch_size * self.num_kv, q_length, self.head_dim)
 
         query_layer, key_layer = self.rotary(query_layer, key_layer)
 
