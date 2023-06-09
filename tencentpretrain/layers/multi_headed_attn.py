@@ -189,7 +189,7 @@ class FlashAttention(nn.Module):
         print("query_layer", query_layer.shape)
         print(self.num_heads, self.head_dim)
         query_layer = query_layer.transpose(1, 2).reshape(batch_size * self.num_heads, q_length, self.head_dim)
-        
+        print("key_layer", key_layer.shape)
 
         key_layer = key_layer.transpose(1, 2).reshape(
             batch_size * self.num_heads,
