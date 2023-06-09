@@ -101,9 +101,9 @@ class FlashAttention(nn.Module):
     def __init__(self, hidden_size, heads_num, attention_head_size, dropout, has_bias=True, with_scale=True,
                  lora_params=None):
         super(FlashAttention, self).__init__()
-        self.num_heads = heads_num
-        self.hidden_size = hidden_size
-        self.head_dim = attention_head_size
+        self.num_heads = heads_num #71
+        self.hidden_size = hidden_size #4544
+        self.head_dim = attention_head_size #64
         self.with_scale = with_scale
         self.inner_hidden_size = heads_num * attention_head_size
         self.multi_query = True
@@ -178,15 +178,19 @@ class FlashAttention(nn.Module):
         Returns:
             output: [batch_size x seq_length x hidden_size]
         """
-        batch_size, seq_length, _ = query.size()
         fused_qkv = self.query_key_value(query)
 
         # 3 x [batch_size, seq_length, num_heads, head_dim]
         (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
 
         batch_size, q_length, _, _ = query_layer.shape
-
+        print("batch_size", batch_size)
+        print("q_length", q_length)
+        print("query_layer", query_layer.shape)
+        print(self.num_heads, self.head_dim)
         query_layer = query_layer.transpose(1, 2).reshape(batch_size * self.num_heads, q_length, self.head_dim)
+        
+
         key_layer = key_layer.transpose(1, 2).reshape(
             batch_size * self.num_heads,
             q_length,
