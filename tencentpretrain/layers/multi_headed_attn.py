@@ -198,7 +198,6 @@ class FlashAttention(nn.Module):
 
         _, kv_length, _ = key_layer.shape
 
-
         query_layer_ = query_layer.reshape(batch_size, self.num_heads, -1, self.head_dim)
         key_layer_ = key_layer.reshape(batch_size, self.num_kv, -1, self.head_dim)
         value_layer_ = value_layer.reshape(batch_size, self.num_kv, -1, self.head_dim)

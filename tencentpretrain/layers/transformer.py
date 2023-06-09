@@ -1,9 +1,5 @@
 import torch.nn as nn
-from tencentpretrain.layers.layer_norm import *
-from tencentpretrain.layers.position_ffn import PositionwiseFeedForward, GatedFeedForward
-from tencentpretrain.layers.multi_headed_attn import *
-from tencentpretrain.layers.relative_position_embedding import RelativePositionEmbedding
-
+from tencentpretrain.layers import *
 
 
 class TransformerLayer(nn.Module):
@@ -29,41 +25,24 @@ class TransformerLayer(nn.Module):
         if hasattr(args, "lora_params"):
             lora_params = args.lora_params
 
-        if args.attention == "flash_attention":
-            self.self_attn = FlashAttention(
-                args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
-                with_scale = with_scale, lora_params=lora_params
-            )
-        else:
-            self.self_attn = MultiHeadedAttention(
-                args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
-                with_scale = with_scale, lora_params=lora_params
-            )
+        self.self_attn = str2attention[args.attention](
+            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+            with_scale = with_scale, lora_params=lora_params
+        )
+
         self.dropout_1 = nn.Dropout(args.dropout)
 
         # Feed forward layer.
-        if args.feed_forward == "gated":
-            self.feed_forward = GatedFeedForward(
-                args.hidden_size, args.feedforward_size, args.hidden_act, has_bias
-            )
-        else:
-            self.feed_forward = PositionwiseFeedForward(
-                args.hidden_size, args.feedforward_size, args.hidden_act, has_bias
-            )
+        self.feed_forward = str2feedforward[args.feed_forward](
+            args.hidden_size, args.feedforward_size, args.hidden_act, has_bias
+        )
+
         self.dropout_2 = nn.Dropout(args.dropout)
 
-        if args.layernorm == "t5":
-            self.layer_norm_1 = T5LayerNorm(args.hidden_size)
-            self.layer_norm_2 = T5LayerNorm(args.hidden_size)
-        elif args.layernorm == "rms":
-            self.layer_norm_1 = RMSNorm(args.hidden_size)
-            self.layer_norm_2 = RMSNorm(args.hidden_size)
-        elif args.layernorm == "normal_torch":
-            self.layer_norm_1 = nn.LayerNorm(args.hidden_size, eps=args.layernorm_eps)
-            self.layer_norm_2 = nn.LayerNorm(args.hidden_size, eps=args.layernorm_eps)
-        else:
-            self.layer_norm_1 = LayerNorm(args.hidden_size)
-            self.layer_norm_2 = LayerNorm(args.hidden_size)
+        self.layer_norm_1 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
+        if self.layernorm_positioning is not "flash":
+            self.layer_norm_2 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
+
 
     def forward(self, hidden, mask, position_bias=None, has_residual_attention=False, prev_attn=None, freqs_cis=None):
         """
@@ -81,13 +60,20 @@ class TransformerLayer(nn.Module):
             inter = self.layer_norm_1(inter + hidden)
             output = self.dropout_2(self.feed_forward(inter))
             output = self.layer_norm_2(output + inter)
-        else:
+        elif self.layernorm_positioning == "pre":
             inter = self.layer_norm_1(hidden)
             inter, prev_attn_out = self.self_attn(inter, inter, inter, mask, position_bias, has_residual_attention, prev_attn, freqs_cis)
             inter = self.dropout_1(inter)
             hidden = hidden + inter
             output = self.layer_norm_2(hidden)
             output = self.dropout_2(self.feed_forward(output)) + hidden
+        else: # flash: Flash Attention
+            inter = self.layer_norm_1(hidden)
+            attn_output, prev_attn_out = self.self_attn(inter, inter, inter, mask, position_bias, has_residual_attention, prev_attn, freqs_cis)
+            mlp_output = self.feed_forward(inter)
+            inter = self.dropout_1(mlp_output + attn_output)
+            output = inter + hidden
+
         return output, prev_attn_out
 
 
