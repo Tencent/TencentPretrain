@@ -14,7 +14,7 @@
   "attention": "flash_attention",
   "encoder": "transformer",
   "mask": "causal",
-  "layernorm_positioning": "pre",
+  "layernorm_positioning": "flash",
   "layernorm": "normal_torch",
   "layernorm_eps": 1e-5,
   "target": ["lm"]
