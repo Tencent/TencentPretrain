@@ -116,13 +116,13 @@ class FlashAttention(nn.Module):
 
         self.query_key_value = nn.Linear(
             self.hidden_size,
-            self.hidden_size + 2 * self.head_dim, #if not config.multi_query else (self.hidden_size + 2 * self.head_dim),
+            3 * self.hidden_size if not self.multi_query else (self.hidden_size + 2 * self.head_dim),
             bias=has_bias
         )
 
         self.dense = nn.Linear(self.hidden_size, self.hidden_size, bias=has_bias)
         self.attention_dropout = nn.Dropout(dropout)
-        self.num_kv = 1
+        self.num_kv = self.num_heads if not self.multi_query else 1
 
     def _split_heads(self, fused_qkv: torch.Tensor):
         """
@@ -182,14 +182,17 @@ class FlashAttention(nn.Module):
 
         # 3 x [batch_size, seq_length, num_heads, head_dim]
         (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
-
+        print("query_layer", query_layer.shape)
+        print("key_layer", key_layer.shape)
+        print("value_layer", value_layer.shape)
+        
         batch_size, q_length, _, _ = query_layer.shape
         print("batch_size", batch_size)
         print("q_length", q_length)
-        print("query_layer", query_layer.shape)
+
         print(self.num_heads, self.head_dim)
         query_layer = query_layer.transpose(1, 2).reshape(batch_size * self.num_heads, q_length, self.head_dim)
-        print("key_layer", key_layer.shape)
+
 
         key_layer = key_layer.transpose(1, 2).reshape(
             batch_size * self.num_heads,
