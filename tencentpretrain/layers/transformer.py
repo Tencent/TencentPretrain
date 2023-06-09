@@ -41,6 +41,7 @@ class TransformerLayer(nn.Module):
 
         self.layer_norm_1 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
         if self.layernorm_positioning is not "flash":
+            print("*************",self.layernorm_positioning)
             self.layer_norm_2 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
 
 
