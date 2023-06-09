@@ -602,3 +602,19 @@ class TextImageTokenizer(BertTokenizer):
         self.vocab_bias = len(self.vocab)
         for i in range(args.image_tokenizer["image_vocab_size"]):
             self.vocab[i + self.vocab_bias] = str(i)
+
+
+class HFPreTrainedTokenizer(Tokenizer):
+    def __init__(self, args, is_src=True):
+        from transformers import AutoTokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained(args.vocab_path)
+        self.vocab = self.tokenizer.vocab
+
+    def tokenize(self, text):
+        return self.tokenizer.tokenize(text)
+
+    def convert_tokens_to_ids(self, tokens):
+        return self.tokenizer.convert_tokens_to_ids(tokens)
+
+    def convert_ids_to_tokens(self, ids):
+        return self.tokenizer.convert_ids_to_tokens(ids)

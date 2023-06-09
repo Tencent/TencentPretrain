@@ -177,7 +177,8 @@ def infer_opts(parser):
 
 
 def tokenizer_opts(parser):
-    parser.add_argument("--tokenizer", choices=["bert", "bpe", "char", "space", "xlmroberta", "image", "text_image", "virtual"], default="bert",
+    parser.add_argument("--tokenizer", choices=["bert", "bpe", "char", "space", "xlmroberta", "image", "text_image",
+                                                "virtual", "hfpretrained"], default="bert",
                         help="Specify the tokenizer." 
                              "Original Google BERT uses bert tokenizer."
                              "Char tokenizer segments sentences into characters."
