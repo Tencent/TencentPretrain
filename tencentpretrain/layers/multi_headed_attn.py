@@ -185,7 +185,7 @@ class FlashAttention(nn.Module):
         print("query_layer", query_layer.shape)
         print("key_layer", key_layer.shape)
         print("value_layer", value_layer.shape)
-        
+
         batch_size, q_length, _, _ = query_layer.shape
         print("batch_size", batch_size)
         print("q_length", q_length)
