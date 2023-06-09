@@ -182,13 +182,8 @@ class FlashAttention(nn.Module):
 
         # 3 x [batch_size, seq_length, num_heads, head_dim]
         (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
-        print("query_layer", query_layer.shape)
-        print("key_layer", key_layer.shape)
-        print("value_layer", value_layer.shape)
-
         batch_size, q_length, _, _ = query_layer.shape
-        print("batch_size", batch_size)
-        print("q_length", q_length)
+
 
         print(self.num_heads, self.head_dim)
         query_layer = query_layer.transpose(1, 2).reshape(batch_size * self.num_heads, q_length, self.head_dim)
@@ -204,6 +199,27 @@ class FlashAttention(nn.Module):
         query_layer, key_layer = self.rotary(query_layer, key_layer)
 
         _, kv_length, _ = key_layer.shape
+
+
+        query_layer_ = query_layer.reshape(batch_size, self.num_heads, -1, self.head_dim)
+        key_layer_ = key_layer.reshape(batch_size, self.num_kv, -1, self.head_dim)
+        value_layer_ = value_layer.reshape(batch_size, self.num_kv, -1, self.head_dim)
+
+        attn_output = F.scaled_dot_product_attention(
+            query_layer_, key_layer_, value_layer_, None, 0.0, is_causal=True
+        )
+
+        x = attn_output.view(batch_size, self.num_heads, q_length, self.head_dim)
+        x = x.permute(0, 2, 1, 3)
+        attn_output = x.reshape(batch_size, q_length, self.num_heads * self.head_dim)
+
+        output_tensor = self.dense(attn_output)
+
+        return output_tensor, None
+
+        """
+        print("query_layer", query_layer.shape)
+        print("key_layer", key_layer.shape)
 
         matmul_result = query_layer @ key_layer.transpose(-1, -2)
 
@@ -239,3 +255,4 @@ class FlashAttention(nn.Module):
         output_tensor = self.dense(context_layer)
 
         return output_tensor, None
+        """
