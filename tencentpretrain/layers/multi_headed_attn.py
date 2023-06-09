@@ -184,8 +184,6 @@ class FlashAttention(nn.Module):
         (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
         batch_size, q_length, _, _ = query_layer.shape
 
-
-        print(self.num_heads, self.head_dim)
         query_layer = query_layer.transpose(1, 2).reshape(batch_size * self.num_heads, q_length, self.head_dim)
 
 
