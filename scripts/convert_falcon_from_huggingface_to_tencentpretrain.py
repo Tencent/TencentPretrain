@@ -40,9 +40,9 @@ for i in range(args.layers_num):
         get_weight_from_name("transformer.h." + str(i) + ".input_layernorm.bias")
 
     output_model["encoder.transformer." + str(i) + ".self_attn.query_key_value.weight"] = \
-        get_weight_from_name("transformer.h." + str(i) + ".self_attn.v_proj.weight")
+        get_weight_from_name("transformer.h." + str(i) + ".self_attention.query_key_value.weight")
     output_model["encoder.transformer." + str(i) + ".self_attn.dense.weight"] = \
-        get_weight_from_name("transformer.h." + str(i) + ".self_attn.v_proj.weight")
+        get_weight_from_name("transformer.h." + str(i) + ".self_attention.dense.weight")
 
     output_model["encoder.transformer." + str(i) + ".feed_forward.linear_1.weight"] = \
         get_weight_from_name("transformer.h." + str(i) + ".mlp.dense_h_to_4h.weight")
