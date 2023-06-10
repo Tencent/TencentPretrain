@@ -41,7 +41,6 @@ class TransformerLayer(nn.Module):
 
         self.layer_norm_1 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
         if self.layernorm_positioning != "flash":
-            print("*************",self.layernorm_positioning)
             self.layer_norm_2 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
 
 
@@ -69,9 +68,13 @@ class TransformerLayer(nn.Module):
             output = self.layer_norm_2(hidden)
             output = self.dropout_2(self.feed_forward(output)) + hidden
         else: # flash: Flash Attention
+            print("1-transformer_input(norm_input):", hidden[0][0][0:8])
             inter = self.layer_norm_1(hidden)
+            print("2-attention_input(norm_output):", inter[0][0][0:8])
             attn_output, prev_attn_out = self.self_attn(inter, inter, inter, mask, position_bias, has_residual_attention, prev_attn, freqs_cis)
+            print("3-attention_output:", attn_output[0][0][0:8])
             mlp_output = self.feed_forward(inter)
+            print("4-mlp_output:", mlp_output[0][0][0:8])
             inter = self.dropout_1(mlp_output + attn_output)
             output = inter + hidden
 

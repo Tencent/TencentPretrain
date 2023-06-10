@@ -178,8 +178,6 @@ class FlashAttention(nn.Module):
         Returns:
             output: [batch_size x seq_length x hidden_size]
         """
-        print("attention_input:", torch.mean(query),torch.max(query))
-
 
         fused_qkv = self.query_key_value(query)
 
@@ -214,9 +212,6 @@ class FlashAttention(nn.Module):
         attn_output = x.reshape(batch_size, q_length, self.num_heads * self.head_dim)
 
         output_tensor = self.dense(attn_output)
-
-        print("attention_output:", torch.mean(output_tensor),torch.max(output_tensor))
-
 
         return output_tensor, None
 
