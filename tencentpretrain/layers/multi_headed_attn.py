@@ -94,35 +94,35 @@ class MultiHeadedAttention(nn.Module):
 
 class FlashAttention(nn.Module):
     """
-    Each head is a self-attention operation.
-    self-attention refers to https://arxiv.org/pdf/1706.03762.pdf
+    Flash Attention used in Falcon.
+    https://huggingface.co/tiiuae/falcon-7b/blob/main/modelling_RW.py#L154
     """
 
     def __init__(self, hidden_size, heads_num, attention_head_size, dropout, has_bias=True, with_scale=True,
                  lora_params=None):
         super(FlashAttention, self).__init__()
-        self.num_heads = heads_num #71
-        self.hidden_size = hidden_size #4544
-        self.head_dim = attention_head_size #64
+        self.heads_num = heads_num
+        self.hidden_size = hidden_size
+        self.per_head_size = attention_head_size
         self.with_scale = with_scale
         self.inner_hidden_size = heads_num * attention_head_size
         self.multi_query = True
         
 
-        self.rotary = RotaryEmbedding(self.head_dim)
+        self.rotary = RotaryEmbedding(self.per_head_size)
         # Layer-wise attention scaling
-        self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
+        self.inv_norm_factor = 1.0 / math.sqrt(self.per_head_size)
         self.beta = self.inv_norm_factor
 
         self.query_key_value = nn.Linear(
             self.hidden_size,
-            3 * self.hidden_size if not self.multi_query else (self.hidden_size + 2 * self.head_dim),
+            3 * self.hidden_size if not self.multi_query else (self.hidden_size + 2 * self.per_head_size),
             bias=has_bias
         )
 
         self.dense = nn.Linear(self.hidden_size, self.hidden_size, bias=has_bias)
         self.attention_dropout = nn.Dropout(dropout)
-        self.num_kv = self.num_heads if not self.multi_query else 1
+        self.num_kv = self.heads_num if not self.multi_query else 1
 
     def _split_heads(self, fused_qkv: torch.Tensor):
         """
@@ -136,11 +136,11 @@ class FlashAttention(nn.Module):
         """
         if not self.multi_query:
             batch_size, seq_length, three_times_hidden_size = fused_qkv.shape
-            fused_qkv = fused_qkv.view(batch_size, seq_length, self.num_heads, 3, self.head_dim)
+            fused_qkv = fused_qkv.view(batch_size, seq_length, self.heads_num, 3, self.per_head_size)
             return fused_qkv[..., 0, :], fused_qkv[..., 1, :], fused_qkv[..., 2, :]
         else:
             batch_size, seq_length, three_times_hidden_size = fused_qkv.shape
-            fused_qkv = fused_qkv.view(batch_size, seq_length, self.num_heads + 2, self.head_dim)
+            fused_qkv = fused_qkv.view(batch_size, seq_length, self.heads_num + 2, self.per_head_size)
             return fused_qkv[..., :-2, :], fused_qkv[..., [-2], :], fused_qkv[..., [-1], :]
 
     def _merge_heads(self, x: torch.Tensor):
@@ -154,17 +154,17 @@ class FlashAttention(nn.Module):
         # What we want to achieve is:
         # batch_size * num_heads, seq_length, head_dim -> batch_size, seq_length, num_heads * head_dim
         batch_size_and_num_heads, seq_length, _ = x.shape
-        batch_size = batch_size_and_num_heads // self.num_heads
+        batch_size = batch_size_and_num_heads // self.heads_num
 
         # First view to decompose the batch size
         # batch_size * num_heads, seq_length, head_dim -> batch_size, num_heads, seq_length, head_dim
-        x = x.view(batch_size, self.num_heads, seq_length, self.head_dim)
+        x = x.view(batch_size, self.heads_num, seq_length, self.per_head_size)
 
         # batch_size, num_heads, seq_length, head_dim -> batch_size, seq_length, num_heads, head_dim
         x = x.permute(0, 2, 1, 3)
 
         # batch_size, seq_length, num_heads, head_dim -> batch_size, seq_length, num_heads * head_dim
-        return x.reshape(batch_size, seq_length, self.num_heads * self.head_dim)
+        return x.reshape(batch_size, seq_length, self.heads_num * self.per_head_size)
 
     def forward(self, key, value, query, mask, position_bias=None, has_residual_attention=False, prev_attn=None,
                 freqs_cis=None):
@@ -185,31 +185,30 @@ class FlashAttention(nn.Module):
         (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
         batch_size, q_length, _, _ = query_layer.shape
 
-        query_layer = query_layer.transpose(1, 2).reshape(batch_size * self.num_heads, q_length, self.head_dim)
-
+        query_layer = query_layer.transpose(1, 2).reshape(batch_size * self.heads_num, q_length, self.per_head_size)
 
         key_layer = key_layer.transpose(1, 2).reshape(
             batch_size * self.num_kv,
             q_length,
-            self.head_dim,
+            self.per_head_size,
             )
-        value_layer = value_layer.transpose(1, 2).reshape(batch_size * self.num_kv, q_length, self.head_dim)
+        value_layer = value_layer.transpose(1, 2).reshape(batch_size * self.num_kv, q_length, self.per_head_size)
 
         query_layer, key_layer = self.rotary(query_layer, key_layer)
 
         _, kv_length, _ = key_layer.shape
 
-        query_layer_ = query_layer.reshape(batch_size, self.num_heads, -1, self.head_dim)
-        key_layer_ = key_layer.reshape(batch_size, self.num_kv, -1, self.head_dim)
-        value_layer_ = value_layer.reshape(batch_size, self.num_kv, -1, self.head_dim)
+        query_layer_ = query_layer.reshape(batch_size, self.heads_num, -1, self.per_head_size)
+        key_layer_ = key_layer.reshape(batch_size, self.num_kv, -1, self.per_head_size)
+        value_layer_ = value_layer.reshape(batch_size, self.num_kv, -1, self.per_head_size)
 
         attn_output = F.scaled_dot_product_attention(
             query_layer_, key_layer_, value_layer_, None, 0.0, is_causal=True
         )
 
-        x = attn_output.view(batch_size, self.num_heads, q_length, self.head_dim)
+        x = attn_output.view(batch_size, self.heads_num, q_length, self.per_head_size)
         x = x.permute(0, 2, 1, 3)
-        attn_output = x.reshape(batch_size, q_length, self.num_heads * self.head_dim)
+        attn_output = x.reshape(batch_size, q_length, self.heads_num * self.per_head_size)
 
         output_tensor = self.dense(attn_output)
 

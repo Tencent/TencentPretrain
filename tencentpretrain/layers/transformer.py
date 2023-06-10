@@ -40,7 +40,7 @@ class TransformerLayer(nn.Module):
         self.dropout_2 = nn.Dropout(args.dropout)
 
         self.layer_norm_1 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
-        if self.layernorm_positioning != "flash":
+        if self.layernorm_positioning != "parallel_attn":
             self.layer_norm_2 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
 
 
@@ -103,32 +103,23 @@ class TransformerDecoderLayer(nn.Module):
         self.dropout_1 = nn.Dropout(args.dropout)
 
         # Multi-headed context-attention.
-        self.context_attn = MultiHeadedAttention(
+        self.context_attn = str2attention[args.attention](
             args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
             with_scale=with_scale, lora_params=lora_params
         )
         self.dropout_2 = nn.Dropout(args.dropout)
 
         # Feed forward layer.
-        if args.feed_forward == "gated":
-            self.feed_forward = GatedFeedForward(
-                args.hidden_size, args.feedforward_size, args.hidden_act, has_bias
-            )
-        else:
-            self.feed_forward = PositionwiseFeedForward(
-                args.hidden_size, args.feedforward_size, args.hidden_act, has_bias
-            )
+        self.feed_forward = str2feedforward[args.feed_forward](
+            args.hidden_size, args.feedforward_size, args.hidden_act, has_bias
+        )
+
         self.dropout_3 = nn.Dropout(args.dropout)
 
         # Layer Normalization
-        if args.layernorm == "t5":
-            self.layer_norm_1 = T5LayerNorm(args.hidden_size)
-            self.layer_norm_2 = T5LayerNorm(args.hidden_size)
-            self.layer_norm_3 = T5LayerNorm(args.hidden_size)
-        else:
-            self.layer_norm_1 = LayerNorm(args.hidden_size)
-            self.layer_norm_2 = LayerNorm(args.hidden_size)
-            self.layer_norm_3 = LayerNorm(args.hidden_size)
+        self.layer_norm_1 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
+        self.layer_norm_2 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
+        self.layer_norm_3 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
 
     def forward(self, hidden, encoder_hidden, mask_decoder, mask_encoder, self_position_bias=None, context_position_bias=None):
         """
@@ -152,8 +143,7 @@ class TransformerDecoderLayer(nn.Module):
             mid_norm = self.layer_norm_2(mid + query_norm)
             output = self.dropout_3(self.feed_forward(mid_norm))
             output = self.layer_norm_3(output + mid_norm)
-        else:
-
+        elif self.layernorm_positioning == "pre":
             hidden_norm = self.layer_norm_1(hidden)
             query, _ = self.self_attn(hidden_norm, hidden_norm, hidden_norm, mask_decoder, self_position_bias)
             query = self.dropout_1(query)
@@ -164,4 +154,6 @@ class TransformerDecoderLayer(nn.Module):
             mid = mid + query
             mid_norm = self.layer_norm_3(mid)
             output = self.dropout_3(self.feed_forward(mid_norm)) + mid
+        else:
+            raise NotImplementedError
         return output
