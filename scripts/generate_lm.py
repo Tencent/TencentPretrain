@@ -84,13 +84,15 @@ if __name__ == '__main__':
     model = GenerateLm(args)
     model = load_model(model, args.load_model_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model = model.bfloat16()
     model = model.to(device)
 
     model.eval()
 
     with open(args.test_path, mode="r", encoding="utf-8") as f:
         line = f.readline().strip()
-        src = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(line))
+        src = args.tokenizer.convert_tokens_to_ids(args.tokenizer.tokenize(line))
         seg = [1] * len(src)
         beginning_length = len(src)
         if len(src) > args.seq_length:
@@ -100,6 +102,7 @@ if __name__ == '__main__':
 
     with open(args.prediction_path, mode="w", encoding="utf-8") as f:
         for i in range(args.seq_length - beginning_length):
+            print(src_tensor)
             output = model(src_tensor, seg_tensor)
             next_token_logits = output[0][-1] / args.temperature
             filtered_logits = top_k_top_p_filtering(next_token_logits, args.top_k, args.top_p)
