@@ -35,7 +35,9 @@ class GenerateLm(torch.nn.Module):
     def forward(self, src, seg):
         emb = self.embedding(src, seg)
         output = self.encoder(emb, seg)
+        print("lm_logits_input:, ", output[0][0][0:8])
         output = self.target.lm.output_layer(output)
+        print("max_lm_logits_output:, ", torch.argmax(output[0][-1]))
         return output
 
 
@@ -89,8 +91,8 @@ if __name__ == '__main__':
 
     model.eval()
 
-    src = [1]
-    seg = [1]
+    src = [30835, 23, 491, 1536, 304]
+    seg = [1, 1, 1, 1, 1]
 
     src_tensor, seg_tensor = torch.LongTensor([src]).to(device), torch.LongTensor([seg]).to(device)
 
