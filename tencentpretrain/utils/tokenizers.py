@@ -619,3 +619,6 @@ class HFPreTrainedTokenizer(Tokenizer):
 
     def convert_ids_to_tokens(self, ids):
         return self.tokenizer.convert_ids_to_tokens(ids)
+
+    def decode(self, ids):
+        return self.tokenizer.decode(ids)
