@@ -92,7 +92,6 @@ class TransformerEncoder(nn.Module):
 
         hidden = emb
 
-
         if self.relative_position_embedding:
             position_bias = self.relative_pos_emb(hidden, hidden)
         else:
