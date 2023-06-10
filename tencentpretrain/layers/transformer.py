@@ -40,6 +40,8 @@ class TransformerLayer(nn.Module):
         self.dropout_2 = nn.Dropout(args.dropout)
 
         self.layer_norm_1 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
+        print(self.layer_norm_1, args.layernorm_eps)
+        print(self.layer_norm_1.weight[:10])
         if self.layernorm_positioning != "flash":
             self.layer_norm_2 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
 
