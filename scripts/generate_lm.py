@@ -79,13 +79,13 @@ if __name__ == '__main__':
 
     args = load_hyperparam(args)
 
+    args.tokenizer_type = args.tokenizer
     args.tokenizer = str2tokenizer[args.tokenizer](args)
 
     model = GenerateLm(args)
     model = load_model(model, args.load_model_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    #model = model.bfloat16()
     model = model.to(device)
 
     model.eval()
@@ -113,9 +113,11 @@ if __name__ == '__main__':
 
         f.write(line + "\n")
         tokens = [token_id.item() for token_id in src_tensor[0]]
+        if args.tokenizer_type in ["hfpretrained"]:
+            generated_sentence = args.tokenizer.decode(tokens)
         if args.tokenizer.sp_model is not None:
             generated_sentence = args.tokenizer.sp_model.decode(tokens)
         else:
-            generated_sentence = args.tokenizer.decode(tokens)
+            generated_sentence = "".join(args.tokenizer.convert_ids_to_tokens(tokens))
 
         f.write(generated_sentence)

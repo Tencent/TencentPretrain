@@ -436,6 +436,7 @@ class LmDataset(Dataset):
         super(LmDataset, self).__init__(args, vocab, tokenizer)
         self.full_sentences = args.full_sentences
         self.json_format_corpus = args.json_format_corpus
+        self.remove_cls_token = args.remove_cls_token
 
     def worker(self, proc_id, start, end):
         print("Worker %d is building dataset ... " % proc_id)
@@ -455,7 +456,10 @@ class LmDataset(Dataset):
                 pos += 1
 
                 document = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line))
-                document = [self.vocab.get(CLS_TOKEN)] + document + [self.vocab.get(SEP_TOKEN)]
+                if self.remove_cls_token:
+                    document = document + [self.vocab.get(SEP_TOKEN)]
+                else:
+                    document = [self.vocab.get(CLS_TOKEN)] + document + [self.vocab.get(SEP_TOKEN)]
                 if self.full_sentences:
                     buffer.extend(document)
                     instances_num = len(buffer) // (self.seq_length + 1)
