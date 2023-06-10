@@ -139,7 +139,7 @@ class TransformerEncoder(nn.Module):
                                                             has_residual_attention=self.has_residual_attention,
                                                             prev_attn=prev_attn, freqs_cis=freqs_cis)
 
-        if self.layernorm_positioning in ["pre", "flash"]:
+        if self.layernorm_positioning in ["pre", "parallel_attn"]:
             return self.layer_norm(hidden)
         else:
             return hidden
