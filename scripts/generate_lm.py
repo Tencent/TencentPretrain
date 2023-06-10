@@ -85,7 +85,7 @@ if __name__ == '__main__':
     model = load_model(model, args.load_model_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = model.bfloat16()
+    #model = model.bfloat16()
     model = model.to(device)
 
     model.eval()
