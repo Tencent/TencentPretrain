@@ -20,8 +20,6 @@ class LayerNorm(nn.Module):
 
         return hidden_states + self.beta
 
-class TorchLayerNorm(nn.LayerNorm):
-    pass
 
 class T5LayerNorm(nn.Module):
     """
