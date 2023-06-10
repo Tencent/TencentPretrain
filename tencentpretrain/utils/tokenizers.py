@@ -608,6 +608,7 @@ class HFPreTrainedTokenizer(Tokenizer):
     def __init__(self, args, is_src=True):
         from transformers import AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(args.vocab_path)
+        self.sp_model = None
         self.vocab = self.tokenizer.vocab
 
     def tokenize(self, text):
