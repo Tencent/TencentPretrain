@@ -202,9 +202,24 @@ class FlashAttention(nn.Module):
         key_layer_ = key_layer.reshape(batch_size, self.num_kv, -1, self.per_head_size)
         value_layer_ = value_layer.reshape(batch_size, self.num_kv, -1, self.per_head_size)
 
-        attn_output = F.scaled_dot_product_attention(
-            query_layer_, key_layer_, value_layer_, None, 0.0, is_causal=True
-        )
+        if torch.__version__ < "2.0.0":
+            scores = torch.matmul(query_layer_, key_layer_.transpose(-2, -1))
+            if self.with_scale:
+                scores = scores / math.sqrt(float(self.per_head_size))
+            scores = scores + mask.type_as(scores)
+            prev_attn_out = None
+            if has_residual_attention:
+                if prev_attn is not None:
+                    scores += prev_attn
+                prev_attn_out = scores
+            probs = nn.Softmax(dim=-1)(scores)
+            attn_output = probs @ value_layer_
+
+        else:
+            prev_attn_out = None
+            attn_output = F.scaled_dot_product_attention(
+                query_layer_, key_layer_, value_layer_, None, 0.0, is_causal=True
+            )
 
         x = attn_output.view(batch_size, self.heads_num, q_length, self.per_head_size)
         x = x.permute(0, 2, 1, 3)
@@ -212,4 +227,4 @@ class FlashAttention(nn.Module):
 
         output_tensor = self.dense(attn_output)
 
-        return output_tensor, None
+        return output_tensor, prev_attn_out
