@@ -39,6 +39,7 @@ def main():
                         help="Probability of truncating sequence."
                              "The larger value, the higher probability of using short (truncated) sequence.")
     parser.add_argument("--full_sentences", action="store_true", help="Full sentences.")
+    parser.add_argument("--remove_cls_token", action="store_true", help="Preprocess without CLS tokens.")
     parser.add_argument("--seed", type=int, default=7, help="Random seed.")
 
     # Masking options.
