@@ -100,7 +100,6 @@ class Trainer(object):
 
         self.start_time = time.time()
         self.total_loss = 0.0
-        self.best_loss = float("inf")
 
         self.dist_train = args.dist_train
         self.batch_size = args.batch_size
