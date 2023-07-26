@@ -61,7 +61,7 @@ TencentPretrain has the following features:
 <br/>
 
 ## Quickstart
-This section uses several commonly-used examples to demonstrate how to use TencentPretrain. More details are discussed in Instructions section. We firstly use BERT (a text pre-training model) on book review sentiment classification dataset. The dataset is collected by [this paper](http://www.cips-cl.org/static/anthology/CCL-2018/CCL-18-086.pdf) and is available [here](https://github.com/Embedding/Embedding.github.io/blob/master/extrinsic_eval_data.zip). We pre-train model on book review corpus and then fine-tune it on book review sentiment classification dataset. There are three input files: book review corpus, book review sentiment classification dataset, and vocabulary. All files are encoded in UTF-8 and included in this project.
+This section uses several commonly-used examples to demonstrate how to use TencentPretrain. More details are discussed in Instructions section. We firstly use BERT (a text pre-training model) on book review sentiment classification dataset. We pre-train model on book review corpus and then fine-tune it on book review sentiment classification dataset. There are three input files: book review corpus, book review sentiment classification dataset, and vocabulary. All files are encoded in UTF-8 and included in this project.
 
 The format of the corpus for BERT is as follows (one sentence per line and documents are delimited by empty lines)：
 ```
