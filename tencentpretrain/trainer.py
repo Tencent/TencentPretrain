@@ -37,7 +37,7 @@ def train_and_validate(args):
         # Initialize with pretrained model.
         if args.deepspeed and args.enable_zero3:
             if os.path.isdir(args.pretrained_model_path):
-                index_filename = os.path.join(args.pretrained_model_path, 'pytorch_model.bin.index.json')
+                index_filename = os.path.join(args.pretrained_model_path, "tencentpretrain_model.bin.index.json")
                 with open(index_filename, "r") as f:
                     index = json.loads(f.read())
                 shard_filenames = sorted(set(index["weight_map"].values()))
@@ -46,7 +46,8 @@ def train_and_validate(args):
                     model_for_training = _load_state_dict_into_model(model_for_training, shard_file, "")
             else:
                 model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path, "")
-                model_for_training = _load_state_dict_into_model(model_for_training, args.lora_pretrained_model_path, "")
+                if args.lora_pretrained_model_path is not None:
+                    model_for_training = _load_state_dict_into_model(model_for_training, args.lora_pretrained_model_path, "")
         else:
             model_for_training = load_model(model_for_training, args.pretrained_model_path,
                                         args.lora_pretrained_model_path)
@@ -99,7 +100,6 @@ class Trainer(object):
 
         self.start_time = time.time()
         self.total_loss = 0.0
-        self.best_loss = float("inf")
 
         self.dist_train = args.dist_train
         self.batch_size = args.batch_size
@@ -158,21 +158,11 @@ class Trainer(object):
                             save_model(model, self.output_model_path + "-" + str(self.current_step), args.use_lora)
                     else:
                         model.save_checkpoint(self.output_model_path, str(self.current_step))
-                    if loss.item() < self.best_loss:
-                        self.best_loss = loss.item()
-                        if args.use_lora:
-                            if rank == 0:
-                                save_model(model, self.output_model_path + "-" + str(self.current_step), args.use_lora)
-                        else:
-                            model.save_checkpoint(self.output_model_path, "-best")
+
             else:
                 if self.current_step % self.save_checkpoint_steps == 0 and \
                         (not self.dist_train or (self.dist_train and rank == 0)):
                     save_model(model, self.output_model_path + "-" + str(self.current_step), args.use_lora)
-                    if loss.item() < self.best_loss:
-                        self.best_loss = loss.item()
-                        print("save best model! loss:" + str(self.best_loss))
-                        save_model(model, self.output_model_path + "-best", args.use_lora)
 
             self.current_step += 1
 

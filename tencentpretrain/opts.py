@@ -30,7 +30,7 @@ def model_opts(parser):
                         help="Remove attention scale.")
     parser.add_argument("--remove_transformer_bias", action="store_true",
                         help="Remove bias on transformer layers.")
-    parser.add_argument("--layernorm", choices=["normal", "t5"], default="normal",
+    parser.add_argument("--layernorm", choices=["normal", "t5","rms"], default="normal",
                         help="Layernorm type.")
     parser.add_argument("--bidirectional", action="store_true", help="Specific to recurrent model.")
     parser.add_argument("--parameter_sharing", action="store_true", help="Parameter sharing.")
@@ -43,6 +43,8 @@ def model_opts(parser):
                         help="Tie the word embedding and softmax weights.")
     parser.add_argument("--pooling", choices=["mean", "max", "first", "last"], default="first",
                         help="Pooling type.")
+    parser.add_argument("--prefix_lm_loss", action="store_true",
+                        help="Only compute output loss when SFT.")
 
     vision_opts(parser)
     audio_opts(parser)
