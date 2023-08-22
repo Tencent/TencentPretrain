@@ -61,7 +61,7 @@ class Text2text(torch.nn.Module):
         else:
             decoder_emb = self.tgt_embedding(tgt_in, tgt_seg)
             hidden = self.decoder(memory_bank, decoder_emb, (seg,))
-            loss = self.target(hidden, tgt_out, None)[0]
+            loss = self.target(hidden, tgt_out, tgt_seg)[0]
             return loss, None
 
 
@@ -101,7 +101,7 @@ def read_dataset(args, path):
             while len(tgt_in) < args.tgt_seq_length:
                 tgt_in.append(PAD_ID)
                 tgt_out.append(PAD_ID)
-                tgt_seg.append(PAD_ID)
+                tgt_seg.append(0)
 
             dataset.append((src, tgt_in, tgt_out, seg, tgt_seg))
 
