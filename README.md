@@ -138,12 +138,12 @@ The above content provides basic ways of using TencentPretrain to pre-process, p
 <br/>
 
 ## Pre-training data
-This section provides links to a range of :arrow_right: [__pre-training data__](https://github.com/Tencent/TencentPretrain/wiki/Pretraining-data) :arrow_left: (in other open source projects).
+This section provides links to a range of :arrow_right: [__pre-training data__](https://github.com/Tencent/TencentPretrain/wiki/Pretraining-data) :arrow_left: .
 
 <br/>
 
 ## Downstream datasets
-This section provides links to a range of :arrow_right: [__downstream datasets__](https://github.com/Tencent/TencentPretrain/wiki/Downstream-datasets) :arrow_left: (in other open source projects). TencentPretrain can load these datasets directly.
+This section provides links to a range of :arrow_right: [__downstream datasets__](https://github.com/Tencent/TencentPretrain/wiki/Downstream-datasets) :arrow_left: . TencentPretrain can load these datasets directly.
 
 <br/>
 
@@ -194,3 +194,17 @@ Comprehensive examples of using TencentPretrain can be found in :arrow_right: [_
 
 ## Competition solutions
 TencentPretrain has been used in winning solutions of many competitions. In this section, we provide some examples of using TencentPretrain to achieve SOTA results on competitions, such as CLUE. See :arrow_right: [__competition solutions__](https://github.com/Tencent/TencentPretrain/wiki/Competition-solutions) :arrow_left: for more detailed information.
+
+<br/>
+
+## Citation
+#### If you are using the work (e.g. pre-trained models) in TencentPretrain for academic work, please cite the [system paper](https://arxiv.org/pdf/2212.06385.pdf) published in ACL 2023:
+```
+@article{zhao2023tencentpretrain,
+  title={TencentPretrain: A Scalable and Flexible Toolkit for Pre-training Models of Different Modalities},
+  author={Zhao, Zhe and Li, Yudong and Hou, Cheng and Zhao, Jing and others},
+  journal={ACL 2023},
+  pages={217},
+  year={2023}
+}
+```
