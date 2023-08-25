@@ -132,12 +132,12 @@ python3 inference/run_classifier_infer.py --load_model_path models/finetuned_mod
 <br>
 
 ## 预训练数据
-我们提供了链接，指向一系列其他项目开源的 :arrow_right: [__预训练数据__](https://github.com/Tencent/TencentPretrain/wiki/预训练数据) :arrow_left: 。
+我们提供了链接，指向一系列开源的 :arrow_right: [__预训练数据__](https://github.com/Tencent/TencentPretrain/wiki/预训练数据) :arrow_left: 。
 
 <br>
 
 ## 下游任务数据集
-我们提供了链接，指向一系列其他项目开源的 :arrow_right: [__下游任务数据集__](https://github.com/Tencent/TencentPretrain/wiki/下游任务数据集) :arrow_left: 。TencentPretrain可以直接加载这些数据集。
+我们提供了链接，指向一系列开源的 :arrow_right: [__下游任务数据集__](https://github.com/Tencent/TencentPretrain/wiki/下游任务数据集) :arrow_left: 。TencentPretrain可以直接加载这些数据集。
 
 <br>
 
@@ -186,3 +186,17 @@ TencentPretrain/
 
 ## 竞赛解决方案
 TencentPretrain已被用于许多竞赛的获奖解决方案中。在本章节中，我们提供了一些使用TencentPretrain在竞赛中获得SOTA成绩的示例，例如CLUE。更多详细信息参见 :arrow_right: [__竞赛解决方案__](https://github.com/Tencent/TencentPretrain/wiki/竞赛解决方案) :arrow_left: 。
+
+<br/>
+
+## 引用
+#### 如果您在您的学术工作中使用我们的工作（比如模型仓库中的预训练模型），可以引用我们的[论文](https://arxiv.org/pdf/2212.06385.pdf)：
+```
+@article{zhao2023tencentpretrain,
+  title={TencentPretrain: A Scalable and Flexible Toolkit for Pre-training Models of Different Modalities},
+  author={Zhao, Zhe and Li, Yudong and Hou, Cheng and Zhao, Jing and others},
+  journal={ACL 2023},
+  pages={217},
+  year={2023}
+}
+```
