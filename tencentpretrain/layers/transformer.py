@@ -20,6 +20,11 @@ class TransformerLayer(nn.Module):
         else:
             attention_head_size = args.hidden_size // args.heads_num
 
+        if hasattr(args, "n_local_kv_heads"):
+            n_local_kv_heads = args.n_local_kv_heads
+        else:
+            n_local_kv_heads = args.heads_num
+
         has_bias = bool(1 - args.remove_transformer_bias)
         with_scale = bool(1 - args.remove_attention_scale)
 
@@ -29,7 +34,7 @@ class TransformerLayer(nn.Module):
             lora_params = args.lora_params
 
         self.self_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+            args.hidden_size, args.heads_num, attention_head_size, n_local_kv_heads, args.dropout, has_bias=has_bias,
             with_scale = with_scale, lora_params=lora_params
         )
         self.dropout_1 = nn.Dropout(args.dropout)
@@ -92,6 +97,11 @@ class TransformerDecoderLayer(nn.Module):
         else:
             attention_head_size = args.hidden_size // args.heads_num
 
+        if hasattr(args, "n_local_kv_heads"):
+            n_local_kv_heads = args.n_local_kv_heads
+        else:
+            n_local_kv_heads = args.heads_num
+
         has_bias = bool(1 - args.remove_transformer_bias)
         with_scale = bool(1 - args.remove_attention_scale)
 
@@ -101,14 +111,14 @@ class TransformerDecoderLayer(nn.Module):
             lora_params = args.lora_params
 
         self.self_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+            args.hidden_size, args.heads_num, attention_head_size, n_local_kv_heads, args.dropout, has_bias=has_bias,
             with_scale=with_scale, lora_params=lora_params
         )
         self.dropout_1 = nn.Dropout(args.dropout)
 
         # Multi-headed context-attention.
         self.context_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, args.dropout, has_bias=has_bias,
+            args.hidden_size, args.heads_num, attention_head_size, n_local_kv_heads, args.dropout, has_bias=has_bias,
             with_scale=with_scale, lora_params=lora_params
         )
         self.dropout_2 = nn.Dropout(args.dropout)
