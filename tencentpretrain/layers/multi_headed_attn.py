@@ -66,8 +66,8 @@ class MultiHeadedAttention(nn.Module):
             output: [batch_size x seq_length x hidden_size]
         """
         batch_size, seq_length, _ = query.size()
-        heads_num = self.heads_num  # 8
-        per_head_size = self.per_head_size#64
+        heads_num = self.heads_num
+        per_head_size = self.per_head_size
         n_local_kv_heads = self.n_local_kv_heads
 
         def shape(x):
