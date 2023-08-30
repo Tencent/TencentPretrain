@@ -46,10 +46,12 @@ class MultiHeadedAttention(nn.Module):
                              lora_alpha=lora_params['lora_alpha'],
                              lora_dropout=lora_params['lora_dropout'], bias=has_bias)]
             )
-
-        self.linear_layers = nn.ModuleList([nn.Linear(hidden_size, self.inner_hidden_size, bias=has_bias) if i==0 else nn.Linear(hidden_size, self.kv_embed_dim, bias=has_bias) for i in range(3)])
-        self.final_linear = nn.Linear(self.inner_hidden_size, hidden_size, bias=has_bias)
+        else:
+            self.linear_layers = nn.ModuleList(
+                [nn.Linear(hidden_size, self.inner_hidden_size, bias=has_bias) if i==0 else nn.Linear(hidden_size, self.kv_embed_dim, bias=has_bias) for i in range(3)]
+            )
         self.dropout = nn.Dropout(dropout)
+        self.final_linear = nn.Linear(self.inner_hidden_size, hidden_size, bias=has_bias)
 
     def forward(self, key, value, query, mask, position_bias=None, has_residual_attention=False, prev_attn=None,
                 freqs_cis=None):
