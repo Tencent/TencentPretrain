@@ -31,6 +31,7 @@ def model_opts(parser):
     parser.add_argument("--remove_transformer_bias", action="store_true",
                         help="Remove bias on transformer layers.")
     parser.add_argument("--layernorm", choices=["normal", "t5", "rms"], default="normal",
+
                         help="Layernorm type.")
     parser.add_argument("--layernorm_eps", type=float, default=1e-6,
                         help="Layernorm eps.")
