@@ -1,7 +1,7 @@
 import json
 
 
-with open("models/special_tokens_map.json", mode="r", encoding="utf-8") as f:
+with open("models/llama_special_tokens_map.json", mode="r", encoding="utf-8") as f:
     special_tokens_map = json.load(f)
 
 UNK_TOKEN = special_tokens_map["unk_token"]
