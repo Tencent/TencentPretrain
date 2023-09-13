@@ -1,9 +1,6 @@
 import torch.nn as nn
-from tencentpretrain.layers.layer_norm import *
-from tencentpretrain.layers.position_ffn import PositionwiseFeedForward, GatedFeedForward
 from tencentpretrain.layers.multi_headed_attn import MultiHeadedAttention
-from tencentpretrain.layers.relative_position_embedding import RelativePositionEmbedding
-
+from tencentpretrain.layers import *
 
 class TransformerLayer(nn.Module):
     """
@@ -35,25 +32,13 @@ class TransformerLayer(nn.Module):
         self.dropout_1 = nn.Dropout(args.dropout)
 
         # Feed forward layer.
-        if args.feed_forward == "gated":
-            self.feed_forward = GatedFeedForward(
-                args.hidden_size, args.feedforward_size, args.hidden_act, has_bias
-            )
-        else:
-            self.feed_forward = PositionwiseFeedForward(
-                args.hidden_size, args.feedforward_size, args.hidden_act, has_bias
-            )
+        self.feed_forward = str2feedforward[args.feed_forward](
+            args.hidden_size, args.feedforward_size, args.hidden_act, has_bias
+        )
         self.dropout_2 = nn.Dropout(args.dropout)
 
-        if args.layernorm == "t5":
-            self.layer_norm_1 = T5LayerNorm(args.hidden_size)
-            self.layer_norm_2 = T5LayerNorm(args.hidden_size)
-        elif args.layernorm == "rms":
-            self.layer_norm_1 = RMSNorm(args.hidden_size)
-            self.layer_norm_2 = RMSNorm(args.hidden_size)
-        else:
-            self.layer_norm_1 = LayerNorm(args.hidden_size)
-            self.layer_norm_2 = LayerNorm(args.hidden_size)
+        self.layer_norm_1 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
+        self.layer_norm_2 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
 
     def forward(self, hidden, mask, position_bias=None, has_residual_attention=False, prev_attn=None, freqs_cis=None):
         """
@@ -114,25 +99,15 @@ class TransformerDecoderLayer(nn.Module):
         self.dropout_2 = nn.Dropout(args.dropout)
 
         # Feed forward layer.
-        if args.feed_forward == "gated":
-            self.feed_forward = GatedFeedForward(
-                args.hidden_size, args.feedforward_size, args.hidden_act, has_bias
-            )
-        else:
-            self.feed_forward = PositionwiseFeedForward(
-                args.hidden_size, args.feedforward_size, args.hidden_act, has_bias
-            )
+        self.feed_forward = str2feedforward[args.feed_forward](
+            args.hidden_size, args.feedforward_size, args.hidden_act, has_bias
+        )
         self.dropout_3 = nn.Dropout(args.dropout)
 
         # Layer Normalization
-        if args.layernorm == "t5":
-            self.layer_norm_1 = T5LayerNorm(args.hidden_size)
-            self.layer_norm_2 = T5LayerNorm(args.hidden_size)
-            self.layer_norm_3 = T5LayerNorm(args.hidden_size)
-        else:
-            self.layer_norm_1 = LayerNorm(args.hidden_size)
-            self.layer_norm_2 = LayerNorm(args.hidden_size)
-            self.layer_norm_3 = LayerNorm(args.hidden_size)
+        self.layer_norm_1 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
+        self.layer_norm_2 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
+        self.layer_norm_3 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
 
     def forward(self, hidden, encoder_hidden, mask_decoder, mask_encoder, self_position_bias=None, context_position_bias=None):
         """

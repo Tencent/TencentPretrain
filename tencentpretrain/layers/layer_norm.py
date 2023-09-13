@@ -7,18 +7,23 @@ class LayerNorm(nn.Module):
     Layer Normalization.
     https://arxiv.org/abs/1607.06450
     """
-    def __init__(self, hidden_size, eps=1e-6):
+    def __init__(self, hidden_size, eps=1e-6, eps_inside=False):
         super(LayerNorm, self).__init__()
         self.eps = eps
+        self.eps_inside = eps_inside
         self.gamma = nn.Parameter(torch.ones(hidden_size))
         self.beta = nn.Parameter(torch.zeros(hidden_size))
 
     def forward(self, x):
         mean = x.mean(-1, keepdim=True)
-        std = x.std(-1, keepdim=True)
-        hidden_states =  self.gamma * (x-mean) / (std + self.eps)
+        if self.eps_inside:
+            std = torch.sqrt(x.var(-1, keepdim=True) + self.eps)
+        else:
+            std = x.std(-1, keepdim=True) + self.eps
+        hidden_states = self.gamma * (x-mean) / std
 
         return hidden_states + self.beta
+
 
 
 class T5LayerNorm(nn.Module):

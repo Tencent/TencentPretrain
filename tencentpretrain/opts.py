@@ -30,8 +30,10 @@ def model_opts(parser):
                         help="Remove attention scale.")
     parser.add_argument("--remove_transformer_bias", action="store_true",
                         help="Remove bias on transformer layers.")
-    parser.add_argument("--layernorm", choices=["normal", "t5"], default="normal",
+    parser.add_argument("--layernorm", choices=["normal", "t5", "rms"], default="normal",
                         help="Layernorm type.")
+    parser.add_argument("--layernorm_eps", type=float, default=1e-6,
+                        help="Layernorm eps.")
     parser.add_argument("--bidirectional", action="store_true", help="Specific to recurrent model.")
     parser.add_argument("--parameter_sharing", action="store_true", help="Parameter sharing.")
     parser.add_argument("--has_residual_attention", action="store_true", help="Add residual attention.")
@@ -173,7 +175,8 @@ def infer_opts(parser):
 
 
 def tokenizer_opts(parser):
-    parser.add_argument("--tokenizer", choices=["bert", "bpe", "char", "space", "xlmroberta", "image", "text_image", "virtual"], default="bert",
+    parser.add_argument("--tokenizer", choices=["bert", "bpe", "char", "space", "xlmroberta", "image", "text_image",
+                                                "virtual", "hfpretrained"], default="bert",
                         help="Specify the tokenizer." 
                              "Original Google BERT uses bert tokenizer."
                              "Char tokenizer segments sentences into characters."
@@ -218,6 +221,8 @@ def deepspeed_opts(parser):
                         help="Checkpoint activation to allow for training with larger models, sequences, and batch sizes.")
     parser.add_argument("--deepspeed_checkpoint_layers_num", type=int, default=1,
                         help="chunk size (number of layers) for checkpointing.")
+    parser.add_argument("--resume_from_checkpoint", type=str, default=None,
+                        help="resume form deepspeed format checkpoint (only support zero1&2).")
     parser.add_argument("--local_rank", type=int, required=False)
 
 

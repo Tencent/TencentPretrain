@@ -33,7 +33,7 @@ def train_and_validate(args):
         model_for_training = build_model(args)
 
     # Load or initialize parameters.
-    if args.pretrained_model_path is not None:
+    if args.pretrained_model_path is not None and args.resume_from_checkpoint is None:
         # Initialize with pretrained model.
         if args.deepspeed and args.enable_zero3:
             if os.path.isdir(args.pretrained_model_path):
@@ -608,7 +608,7 @@ def worker(proc_id, gpu_ranks, args, model_for_training, model_for_dataloader=No
         ]
 
     if args.optimizer in ["adamw"]:
-        if args.deepspeed and deepspeed.__version__ > "0.5.8":
+        if args.deepspeed:
             custom_optimizer = deepspeed.ops.adam.DeepSpeedCPUAdam(optimizer_grouped_parameters, lr=args.learning_rate, bias_correction=False)
         else:
             custom_optimizer = str2optimizer[args.optimizer](optimizer_grouped_parameters, lr=args.learning_rate, correct_bias=False)
@@ -632,6 +632,12 @@ def worker(proc_id, gpu_ranks, args, model_for_training, model_for_dataloader=No
                                                     lr_scheduler=custom_scheduler,
                                                     mpu=None,
                                                     dist_init_required=False)
+        if args.resume_from_checkpoint is not None:
+            load_path, _ = model_for_training.load_checkpoint(
+                args.resume_from_checkpoint, load_optimizer_states=True, load_lr_scheduler_states=True
+            )
+            if load_path is None:
+                raise ValueError(f"[deepspeed] failed to resume from checkpoint {args.resume_from_checkpoint}")
     else:
         if gpu_id is not None:
             model_for_training.cuda(gpu_id)
