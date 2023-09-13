@@ -48,6 +48,10 @@ def model_opts(parser):
                         help="Pooling type.")
     parser.add_argument("--prefix_lm_loss", action="store_true",
                         help="Only compute output loss when SFT.")
+    parser.add_argument("--alibi_position_embedding", action="store_true",
+                        help="whether use alibi position embedding.")
+    parser.add_argument("--layer_number_scale", action="store_true",
+                        help="whether use layer number scaling.")
 
     vision_opts(parser)
     audio_opts(parser)

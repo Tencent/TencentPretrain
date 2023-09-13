@@ -4,36 +4,39 @@ import torch.nn as nn
 from tencentpretrain.utils.rope import apply_rotary_emb
 from tencentpretrain.utils.lora import LoraLinear
 
-def repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
+def repeat_kv(x: torch.Tensor, repeat_num: int) -> torch.Tensor:
     """torch.repeat_interleave(x, dim=2, repeats=n_rep)"""
-    bs, slen, n_kv_heads, head_dim = x.shape
-    if n_rep == 1:
+    bs, seq_length, kv_heads_num, head_dim = x.shape
+    if repeat_num == 1:
         return x
-    return (
-        x[:, :, :, None, :]
-        .expand(bs, slen, n_kv_heads, n_rep, head_dim)
-        .reshape(bs, slen, n_kv_heads * n_rep, head_dim)
-    )
+
+    else:
+        return (
+            x[:, :, :, None, :]
+            .expand(bs, seq_length, kv_heads_num, repeat_num, head_dim)
+            .reshape(bs, seq_length, kv_heads_num * repeat_num, head_dim)
+        )
+
 class MultiHeadedAttention(nn.Module):
     """
     Each head is a self-attention operation.
     self-attention refers to https://arxiv.org/pdf/1706.03762.pdf
     """
 
-    def __init__(self, hidden_size, heads_num, attention_head_size, n_local_kv_heads, dropout, has_bias=True, with_scale=True,
-                 lora_params=None):
+    def __init__(self, hidden_size, heads_num, attention_head_size, local_kv_heads_num, dropout, has_bias=True, with_scale=True,
+                 lora_params=None, layer_number=None):
         super(MultiHeadedAttention, self).__init__()
         self.heads_num = heads_num
         self.per_head_size = attention_head_size
         self.with_scale = with_scale
         self.inner_hidden_size = heads_num * attention_head_size
-        self.n_local_kv_heads = n_local_kv_heads
+        self.local_kv_heads_num = local_kv_heads_num
 
-        self.kv_embed_dim = self.inner_hidden_size // heads_num * self.n_local_kv_heads
-        self.num_head_groups = heads_num // self.n_local_kv_heads
-        assert heads_num >= self.n_local_kv_heads, "heads_num should be greater than or equal to n_local_kv_heads"
-        assert heads_num % self.n_local_kv_heads == 0, "heads_num should be divisible by n_local_kv_heads"
-        self.n_rep = self.heads_num // self.n_local_kv_heads
+        self.kv_embed_dim = self.inner_hidden_size // heads_num * self.local_kv_heads_num
+        self.num_head_groups = heads_num // self.local_kv_heads_num
+        assert heads_num >= self.local_kv_heads_num, "heads_num should be greater than or equal to n_local_kv_heads"
+        assert heads_num % self.local_kv_heads_num == 0, "heads_num should be divisible by n_local_kv_heads"
+        self.repeat_num = self.heads_num // self.local_kv_heads_num
 
         if lora_params is not None:
 
@@ -52,9 +55,13 @@ class MultiHeadedAttention(nn.Module):
             )
         self.dropout = nn.Dropout(dropout)
         self.final_linear = nn.Linear(self.inner_hidden_size, hidden_size, bias=has_bias)
+        # layer-wise attention scaling
+        if layer_number is not None:
+            self.layer_number = max(1, layer_number)
+            self.norm_factor = math.sqrt(self.per_head_size) * self.layer_number
 
     def forward(self, key, value, query, mask, position_bias=None, has_residual_attention=False, prev_attn=None,
-                freqs_cis=None):
+                freqs_cis=None, alibi=None):
         """
         Args:
             key: [batch_size x seq_length x hidden_size]
@@ -68,7 +75,6 @@ class MultiHeadedAttention(nn.Module):
         batch_size, seq_length, _ = query.size()
         heads_num = self.heads_num
         per_head_size = self.per_head_size
-        n_local_kv_heads = self.n_local_kv_heads
 
         def shape(x):
             return x. \
@@ -82,15 +88,15 @@ class MultiHeadedAttention(nn.Module):
         query, key, value = [linear_layer(x) for linear_layer, x in zip(self.linear_layers, [query, key, value])]
 
         query = query.view(batch_size, seq_length, heads_num, per_head_size)
-        key = key.view(batch_size, seq_length, n_local_kv_heads, per_head_size)
-        value = value.view(batch_size, seq_length, n_local_kv_heads, per_head_size)
+        key = key.view(batch_size, seq_length, self.local_kv_heads_num, per_head_size)
+        value = value.view(batch_size, seq_length, self.local_kv_heads_num, per_head_size)
 
         if freqs_cis is not None:
             query, key = apply_rotary_emb(query, key, freqs_cis=freqs_cis)
 
         query = query.transpose(1, 2)
-        key = repeat_kv(key, self.n_rep).transpose(1, 2)
-        value = repeat_kv(value, self.n_rep).transpose(1, 2)
+        key = repeat_kv(key, self.repeat_num).transpose(1, 2)
+        value = repeat_kv(value, self.repeat_num).transpose(1, 2)
 
         scores = torch.matmul(query, key.transpose(2, 3))
 
@@ -98,9 +104,22 @@ class MultiHeadedAttention(nn.Module):
             scores = scores + position_bias
 
         if self.with_scale:
-            scores = scores / math.sqrt(float(per_head_size))
+            if self.layer_number is not None:
+                scores = scores * (1.0 / self.norm_factor)
+            else:
+                scores = scores / math.sqrt(float(per_head_size))
+        if alibi is not None:
+            scores = scores.reshape((-1, scores.shape[-2], scores.shape[-1]))
+            scores += (1.0 / self.layer_number) * alibi
+            scores = scores.view(-1, heads_num, scores.shape[-2], scores.shape[-1])
 
         scores = scores + mask.type_as(scores)
+
+        # scaled softmax
+        if self.layer_number is not None:
+            scores = (scores * self.layer_number) + mask
+            scores = torch.max(scores, torch.tensor(-10000))
+
         prev_attn_out = None
 
         if has_residual_attention:
@@ -113,4 +132,3 @@ class MultiHeadedAttention(nn.Module):
         output = unshape(torch.matmul(probs, value))
         output = self.final_linear(output)
         return output, prev_attn_out
-
