@@ -104,6 +104,7 @@ class MultiHeadedAttention(nn.Module):
         value = repeat_kv(value, self.repeat_num).transpose(1, 2)
 
         print("QK:", query.size(), key.size())
+        print('freqs_cis', freqs_cis.size())
 
         if freqs_cis is not None:
             query, key = apply_rotary_emb(query, key, freqs_cis=freqs_cis)
