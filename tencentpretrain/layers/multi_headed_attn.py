@@ -99,6 +99,7 @@ class MultiHeadedAttention(nn.Module):
         if freqs_cis is not None:
             query, key = apply_rotary_emb(query, key, freqs_cis=freqs_cis)
 
+        print("transpose before QK:", query.size(), key.size())
         query = query.transpose(1, 2)
         key = repeat_kv(key, self.repeat_num).transpose(1, 2)
         value = repeat_kv(value, self.repeat_num).transpose(1, 2)
