@@ -85,7 +85,10 @@ class MultiHeadedAttention(nn.Module):
                    transpose(1, 2)
 
         def unshape(x):
-            return x.transpose(1, 2).contiguous().view(batch_size, seq_length, self.inner_hidden_size)
+            return x. \
+                transpose(1, 2). \
+                contiguous(). \
+                view(batch_size, seq_length, self.inner_hidden_size)
 
         query, key, value = [linear_layer(x) for linear_layer, x in zip(self.linear_layers, [query, key, value])]
 
