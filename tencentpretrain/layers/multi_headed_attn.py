@@ -59,6 +59,8 @@ class MultiHeadedAttention(nn.Module):
         if layer_number is not None:
             self.layer_number = max(1, layer_number)
             self.norm_factor = math.sqrt(self.per_head_size) * self.layer_number
+        else:
+            self.layer_number = None
 
     def forward(self, key, value, query, mask, position_bias=None, has_residual_attention=False, prev_attn=None,
                 freqs_cis=None, alibi=None):
