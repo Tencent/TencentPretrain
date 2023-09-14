@@ -96,8 +96,7 @@ class MultiHeadedAttention(nn.Module):
         key = key.view(batch_size, seq_length, self.local_kv_heads_num, per_head_size)
         value = value.view(batch_size, seq_length, self.local_kv_heads_num, per_head_size)
 
-        if freqs_cis is not None:
-            query, key = apply_rotary_emb(query, key, freqs_cis=freqs_cis)
+
 
         print("transpose before QK:", query.size(), key.size())
         query = query.transpose(1, 2)
@@ -106,6 +105,8 @@ class MultiHeadedAttention(nn.Module):
 
         print("QK:", query.size(), key.size())
 
+        if freqs_cis is not None:
+            query, key = apply_rotary_emb(query, key, freqs_cis=freqs_cis)
         scores = torch.matmul(query, key.transpose(-2, -1))
         print("scores:", scores.size(), mask.size())
 
