@@ -107,7 +107,8 @@ class MultiHeadedAttention(nn.Module):
         print('freqs_cis', freqs_cis.size())
 
         if freqs_cis is not None:
-            query, key = apply_rotary_emb(query, key, freqs_cis=freqs_cis)
+            query, key = apply_rotary_emb(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
+
         scores = torch.matmul(query, key.transpose(-2, -1))
         print("scores:", scores.size(), mask.size())
 
