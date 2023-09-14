@@ -100,7 +100,10 @@ class MultiHeadedAttention(nn.Module):
         key = repeat_kv(key, self.repeat_num).transpose(1, 2)
         value = repeat_kv(value, self.repeat_num).transpose(1, 2)
 
+        print("QK:", query.size(), key.size())
+
         scores = torch.matmul(query, key.transpose(2, 3))
+        print("scores:", scores.size(), mask.size())
 
         if position_bias is not None:
             scores = scores + position_bias
