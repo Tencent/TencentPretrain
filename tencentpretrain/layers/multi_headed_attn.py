@@ -105,7 +105,7 @@ class MultiHeadedAttention(nn.Module):
 
         print("QK:", query.size(), key.size())
 
-        scores = torch.matmul(query, key.transpose(2, 3))
+        scores = torch.matmul(query, key.transpose(-2, -1))
         print("scores:", scores.size(), mask.size())
 
         if position_bias is not None:
