@@ -90,8 +90,6 @@ class TransformerEncoder(nn.Module):
             mask = (mask_a + mask_b + mask_tril >= 2).float()
             mask = (1.0 - mask) * -10000.0
 
-        print('mask:', mask.size())
-
         hidden = emb
 
         if self.relative_position_embedding:
