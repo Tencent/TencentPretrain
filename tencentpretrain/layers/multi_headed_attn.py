@@ -96,21 +96,15 @@ class MultiHeadedAttention(nn.Module):
         key = key.view(batch_size, seq_length, self.local_kv_heads_num, per_head_size)
         value = value.view(batch_size, seq_length, self.local_kv_heads_num, per_head_size)
 
-
-
-        print("transpose before QK:", query.size(), key.size())
         query = query.transpose(1, 2)
         key = repeat_kv(key, self.repeat_num).transpose(1, 2)
         value = repeat_kv(value, self.repeat_num).transpose(1, 2)
 
-        print("QK:", query.size(), key.size())
-        print('freqs_cis', freqs_cis.size())
 
         if freqs_cis is not None:
             query, key = apply_rotary_emb(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
 
         scores = torch.matmul(query, key.transpose(-2, -1))
-        print("scores:", scores.size(), mask.size())
 
         if position_bias is not None:
             scores = scores + position_bias
