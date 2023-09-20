@@ -104,11 +104,6 @@ def optimization_opts(parser):
                         help="Warm up value.")
     parser.add_argument("--decay", type=float, default=0.5,
                         help="decay value.")
-    parser.add_argument("--fp16", action='store_true',
-                        help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit.")
-    parser.add_argument("--fp16_opt_level", choices=["O0", "O1", "O2", "O3" ], default='O1',
-                        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
-                             "See details at https://nvidia.github.io/apex/amp.html")
     parser.add_argument("--optimizer", choices=["adamw", "adafactor"],
                         default="adamw",
                         help="Optimizer type.")
