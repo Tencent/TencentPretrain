@@ -20,7 +20,7 @@
   },
 
   "dropout": 0.1,
-  "embedding": ["dual"],
+  "embedding":["dual"],
   "encoder": "dual",
   "pooling": "mean",
   "tie_weights": true
