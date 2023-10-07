@@ -25,7 +25,6 @@ class LayerNorm(nn.Module):
         return hidden_states + self.beta
 
 
-
 class T5LayerNorm(nn.Module):
     """
     Construct a layernorm module in the T5 style No bias and no subtraction of mean.

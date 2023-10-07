@@ -3,6 +3,7 @@ from tencentpretrain.layers.multi_headed_attn import *
 from tencentpretrain.layers.position_ffn import *
 import torch.nn as nn
 
+
 str2layernorm = {"t5": T5LayerNorm, "rms": RMSNorm, "normal": LayerNorm}
 
 str2feedforward = {"gated": GatedFeedForward, "dense": PositionwiseFeedForward}

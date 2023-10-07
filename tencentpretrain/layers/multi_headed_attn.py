@@ -4,6 +4,7 @@ import torch.nn as nn
 from tencentpretrain.utils.rope import apply_rotary_emb
 from tencentpretrain.utils.lora import LoraLinear
 
+
 def repeat_kv(x: torch.Tensor, repeat_num: int) -> torch.Tensor:
     """torch.repeat_interleave(x, dim=2, repeats=n_rep)"""
     bs, seq_length, kv_heads_num, head_dim = x.shape
@@ -16,6 +17,7 @@ def repeat_kv(x: torch.Tensor, repeat_num: int) -> torch.Tensor:
             .expand(bs, seq_length, kv_heads_num, repeat_num, head_dim)
             .reshape(bs, seq_length, kv_heads_num * repeat_num, head_dim)
         )
+
 
 class MultiHeadedAttention(nn.Module):
     """

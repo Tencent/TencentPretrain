@@ -159,7 +159,6 @@ def train(args, model, optimizer, scheduler, src_batch, seg_batch, start_positio
     if torch.cuda.device_count() > 1:
         loss = torch.mean(loss)
 
-
     loss.backward()
 
     optimizer.step()
