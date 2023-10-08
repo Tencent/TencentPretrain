@@ -4,7 +4,7 @@
   "hidden_size": 8192,
   "hidden_act": "silu",
   "heads_num": 64,
-  "local_kv_head_num": 8,
+  "local_kv_heads_num": 8,
   "layers_num": 80,
   "dropout": 0.0,
   "data_processor": "lm",

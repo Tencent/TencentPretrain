@@ -18,9 +18,9 @@ class TransformerLayer(nn.Module):
             attention_head_size = args.hidden_size // args.heads_num
 
         if hasattr(args, "local_kv_heads_num"):
-            local_kv_head_num = args.local_kv_heads_num
+            local_kv_heads_num = args.local_kv_heads_num
         else:
-            local_kv_head_num = args.heads_num
+            local_kv_heads_num = args.heads_num
 
         has_bias = bool(1 - args.remove_transformer_bias)
         with_scale = bool(1 - args.remove_attention_scale)
@@ -31,7 +31,7 @@ class TransformerLayer(nn.Module):
             lora_params = args.lora_params
 
         self.self_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, local_kv_head_num, args.dropout, has_bias=has_bias,
+            args.hidden_size, args.heads_num, attention_head_size, local_kv_heads_num, args.dropout, has_bias=has_bias,
             with_scale = with_scale, lora_params=lora_params, layer_number=layer_number
         )
         self.dropout_1 = nn.Dropout(args.dropout)
