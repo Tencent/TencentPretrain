@@ -48,5 +48,6 @@ __all__ = ["CharTokenizer", "SpaceTokenizer", "BertTokenizer", "BPETokenizer", "
            "get_linear_schedule_with_warmup", "get_cosine_schedule_with_warmup",
            "get_cosine_with_hard_restarts_schedule_with_warmup",
            "get_polynomial_decay_schedule_with_warmup",
-           "get_constant_schedule", "get_constant_schedule_with_warmup", "str2scheduler",
+           "get_constant_schedule", "get_constant_schedule_with_warmup", 
+           "get_inverse_square_root_schedule_with_warmup", "get_tri_stage_schedule", "str2scheduler",
            "FGM", "PGD", "str2adv"]
