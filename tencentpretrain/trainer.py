@@ -610,7 +610,7 @@ def worker(local_rank, gpu_ranks, args, model_for_training, model_for_dataloader
     elif args.scheduler in ["constant_with_warmup"]:
         custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps*args.warmup)
     elif args.scheduler in ["tri_stage"]:
-        custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps*args.warmup, args.total_steps*args.decay, args.total_steps)
+        custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps*args.warmup, args.total_steps*args.lr_decay, args.total_steps)
     else:
         custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps*args.warmup, args.total_steps)
 
