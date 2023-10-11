@@ -82,7 +82,7 @@ def train_and_validate(args):
         mp.spawn(worker, nprocs=args.ranks_num, args=(args.gpu_ranks, args, model_for_training, model_for_dataloader), daemon=False)
     elif args.single_gpu:
         # Single GPU mode.
-        worker(args.gpu_id, None, args, model_for_training, model_for_dataloader)
+        worker(args.local_rank, None, args, model_for_training, model_for_dataloader)
     else:
         # CPU mode.
         worker(None, None, args, model_for_training, model_for_dataloader)
@@ -114,7 +114,7 @@ class Trainer(object):
 
         raise NotImplementedError
 
-    def train(self, args, gpu_id, rank, loader, model, optimizer, scheduler):
+    def train(self, args, local_rank, global_rank, loader, model, optimizer, scheduler):
         model.train()
         loader_iter = iter(loader)
         while True:
@@ -122,10 +122,10 @@ class Trainer(object):
                 break
             batch = list(next(loader_iter))
             self.seq_length = batch[0].size(1)
-            if gpu_id is not None:
+            if local_rank is not None:
                 for i in range(len(batch)):
                     if torch.is_tensor(batch[i]):
-                        batch[i] = batch[i].cuda(gpu_id)
+                        batch[i] = batch[i].cuda(local_rank)
 
             loss = self.forward_propagation(batch, model)
 
@@ -143,21 +143,21 @@ class Trainer(object):
                     model.zero_grad()
 
             if self.current_step % self.report_steps == 0 and \
-                    (not self.dist_train or (self.dist_train and rank == 0)):
+                    (not self.dist_train or (self.dist_train and global_rank == 0)):
                 self.report_and_reset_stats()
                 self.start_time = time.time()
 
             if args.deepspeed:
                 if self.current_step % self.save_checkpoint_steps == 0:
                     if args.use_lora:
-                        if rank == 0:
+                        if global_rank == 0:
                             save_model(model, self.output_model_path + "-" + str(self.current_step), args.use_lora)
                     else:
                         model.save_checkpoint(self.output_model_path, str(self.current_step))
 
             else:
                 if self.current_step % self.save_checkpoint_steps == 0 and \
-                        (not self.dist_train or (self.dist_train and rank == 0)):
+                        (not self.dist_train or (self.dist_train and global_rank == 0)):
                     save_model(model, self.output_model_path + "-" + str(self.current_step), args.use_lora)
 
             self.current_step += 1
@@ -559,11 +559,11 @@ str2trainer = {"bert": BertTrainer, "mlm": MlmTrainer, "lm": LmTrainer,
                "beit": BeitTrainer, "dalle": DalleTrainer, "alpaca": AlpacaTrainer}
 
 
-def worker(proc_id, gpu_ranks, args, model_for_training, model_for_dataloader=None):
+def worker(local_rank, gpu_ranks, args, model_for_training, model_for_dataloader=None):
     """
     Args:
-        proc_id: The id of GPU for single GPU mode;
-                 The id of process (and GPU) for multiprocessing distributed mode.
+        local_rank: The id of GPU for single GPU mode;
+                    The id of process (and GPU) for multiprocessing distributed mode.
         gpu_ranks: List of ranks of each process.
     """
     set_seed(args.seed)
@@ -574,17 +574,13 @@ def worker(proc_id, gpu_ranks, args, model_for_training, model_for_dataloader=No
     if args.deepspeed:
         import deepspeed
         deepspeed.init_distributed(dist_backend=args.backend)
-        rank = dist.get_rank()
-        gpu_id = proc_id
+        global_rank = dist.get_rank()
     elif args.dist_train:
-        rank = gpu_ranks[proc_id]
-        gpu_id = proc_id
+        global_rank = gpu_ranks[local_rank]
     elif args.single_gpu:
-        rank = None
-        gpu_id = proc_id
+        global_rank = None
     else:
-        rank = None
-        gpu_id = None
+        global_rank = None
 
     # Build optimizer.
     param_optimizer = list(model_for_training.named_parameters())
@@ -634,10 +630,10 @@ def worker(proc_id, gpu_ranks, args, model_for_training, model_for_dataloader=No
             if load_path is None:
                 raise ValueError(f"[deepspeed] failed to resume from checkpoint {args.resume_from_checkpoint}")
     else:
-        if gpu_id is not None:
-            model_for_training.cuda(gpu_id)
+        if local_rank is not None:
+            model_for_training.cuda(local_rank)
             if model_for_dataloader is not None:
-                model_for_dataloader.cuda(gpu_id)
+                model_for_dataloader.cuda(local_rank)
         optimizer = custom_optimizer
         scheduler = custom_scheduler
 
@@ -646,21 +642,21 @@ def worker(proc_id, gpu_ranks, args, model_for_training, model_for_dataloader=No
             dist.init_process_group(backend=args.backend,
                                     init_method=args.master_ip,
                                     world_size=args.world_size,
-                                    rank=rank)
-            model_for_training = DistributedDataParallel(model_for_training, device_ids=[gpu_id], find_unused_parameters=True)
+                                    rank=global_rank)
+            model_for_training = DistributedDataParallel(model_for_training, device_ids=[local_rank], find_unused_parameters=True)
             if model_for_dataloader is not None:
-                model_for_dataloader = DistributedDataParallel(model_for_dataloader, device_ids=[gpu_id], find_unused_parameters=False)
-            args.logger.info("Worker %d is training ... " % rank)
+                model_for_dataloader = DistributedDataParallel(model_for_dataloader, device_ids=[local_rank], find_unused_parameters=False)
+            args.logger.info("Worker %d is training ... " % global_rank)
         else:
             args.logger.info("Worker is training ...")
 
     if args.dist_train:
         if model_for_dataloader is not None:
             model_for_dataloader = model_for_dataloader.module
-        train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, rank, args.world_size, gpu_id, True, model_for_dataloader)
+        train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, global_rank, args.world_size, local_rank, True, model_for_dataloader)
     else:
-        train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, 0, 1, gpu_id, True, model_for_dataloader)
+        train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, 0, 1, local_rank, True, model_for_dataloader)
 
 
     trainer = str2trainer[args.data_processor](args)
-    trainer.train(args, gpu_id, rank, train_loader, model_for_training, optimizer, scheduler)
+    trainer.train(args, local_rank, global_rank, train_loader, model_for_training, optimizer, scheduler)
