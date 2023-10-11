@@ -93,6 +93,7 @@ class MultiHeadedAttention(nn.Module):
                 view(batch_size, seq_length, self.inner_hidden_size)
 
         query, key, value = [linear_layer(x) for linear_layer, x in zip(self.linear_layers, [query, key, value])]
+        print("Q size:", query.size())
 
         query = query.view(batch_size, seq_length, heads_num, per_head_size)
         key = key.view(batch_size, seq_length, self.local_kv_heads_num, per_head_size)
