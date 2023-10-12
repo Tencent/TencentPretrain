@@ -32,6 +32,8 @@ def main():
                         help="Beam width.")
     parser.add_argument("--tgt_seq_length", type=int, default=100,
                         help="inference step.")
+    parser.add_argument("--model_source", type=str, default="tp",
+                        help="pretrain model tool", choices=["tp","hf",None])
     args = parser.parse_args()
 
     # Load the hyperparameters from the config file.
@@ -79,7 +81,16 @@ def main():
             tgt_in_batch = torch.zeros(src_batch.size()[0], 1, dtype = torch.long, device = args.device)
             current_batch_size=tgt_in_batch.size()[0]
             for j in range(current_batch_size):
-                tgt_in_batch[j][0] = torch.LongTensor(CLS_ID) # SEP_ID for huggingface model
+                if args.model_source == "tp": # pretrained by TencentPretrain
+                    tgt_in_batch[j][0] = torch.LongTensor(CLS_ID)
+                    first_token = CLS_TOKEN
+                elif args.model_source == "hf": # pretrained by Huggingface
+                    tgt_in_batch[j][0] = torch.LongTensor(SEP_ID)
+                    first_token = SEP_TOKEN
+                else:
+                    print("unsupported model source! The inference results may not be right")
+                    tgt_in_batch[j][0] = torch.LongTensor(SEP_ID)
+                    first_token = SEP_TOKEN
 
             with torch.no_grad():
                 memory_bank, emb = model(src_batch, None, seg_batch, None, only_use_encoder=True)
@@ -87,7 +98,7 @@ def main():
             step = 0
             scores = torch.zeros(current_batch_size, beam_width, tgt_seq_length)
             tokens = torch.zeros(current_batch_size, beam_width, tgt_seq_length+1, dtype = torch.long)
-            tokens[:,:,0] = torch.LongTensor(args.tokenizer.convert_tokens_to_ids([CLS_TOKEN])) # SEP_TOKEN for huggingface model
+            tokens[:,:,0] = torch.LongTensor(args.tokenizer.convert_tokens_to_ids([first_token])) # SEP_TOKEN for huggingface model
             emb = emb.repeat(1, beam_width, 1).reshape(current_batch_size * beam_width, -1, int(args.conv_channels[-1] / 2)) #same batch nearby
             memory_bank = memory_bank.repeat(1, beam_width, 1).reshape(current_batch_size * beam_width, -1, args.emb_size) 
             tgt_in_batch = tgt_in_batch.repeat(beam_width, 1)
@@ -129,7 +140,10 @@ def main():
             for i in range(current_batch_size):
                 for j in range(1):
                     res = "".join([args.tokenizer.inv_vocab[token_id.item()] for token_id in tokens[i,j,:]])
-                    res = res.split(SEP_TOKEN)[0].split(CLS_TOKEN)[1] # res.split(SEP_TOKEN)[1] for huggingface model
+                    if args.model_source == "tp":
+                        res = res.split(SEP_TOKEN)[0].split(CLS_TOKEN)[1]
+                    else:
+                        res = res.split(SEP_TOKEN)[1]
                     res = res.replace('▁',' ')
                     f.write(res)
                     f.write("\n")
