@@ -69,7 +69,7 @@ class Speech2text(torch.nn.Module):
         else:
             decoder_emb = self.tgt_embedding(tgt_in, tgt_seg)
             hidden = self.decoder(memory_bank, decoder_emb, (seg,))
-            loss = self.target(hidden, tgt_out, None)[0]
+            loss = self.target(hidden, tgt_out, tgt_seg)[0]
             return loss, None
 
 
