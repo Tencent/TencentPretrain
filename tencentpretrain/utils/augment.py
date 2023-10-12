@@ -31,7 +31,7 @@ class SpecAugment():
 
     def __call__(self, spectrogram):
         assert len(spectrogram.shape) == 2, "spectrogram must be a 2-D tensor."
-
+        spectrogram = spectrogram.cpu().numpy()
         distorted = spectrogram.copy()  # make a copy of input spectrogram.
         num_frames = spectrogram.shape[0]  # or 'tau' in the paper.
         num_freqs = spectrogram.shape[1]  # or 'miu' in the paper.

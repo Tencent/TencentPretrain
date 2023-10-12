@@ -31,7 +31,7 @@
    "time_mask_N": 2,
    "time_mask_T": 100,
    "time_mask_p": 1.0,
-   "time_wrap_W": 0
+   "time_warp_W": 0
   },
   "label_smoothing": 0.1,
   "ignore_index": true

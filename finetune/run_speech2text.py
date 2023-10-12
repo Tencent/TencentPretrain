@@ -6,8 +6,10 @@ import os
 import random
 import argparse
 import editdistance
+import math
 import torch
 import torchaudio
+import torch.nn.functional as F
 import torchaudio.compliance.kaldi as ta_kaldi
 
 tencentpretrain_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -167,6 +169,8 @@ def evaluate(args, dataset):
 
     generated_sentences = []
     args.model.eval()
+    PAD_ID = args.tokenizer.convert_tokens_to_ids([PAD_TOKEN])
+    SEP_ID = args.tokenizer.convert_tokens_to_ids([SEP_TOKEN])
 
     for i, (src_batch, tgt_in_batch, tgt_out_batch, seg_batch, tgt_seg_batch) in enumerate(batch_loader(args.batch_size, src, tgt_in, tgt_out, seg, tgt_seg)):
 
@@ -179,19 +183,24 @@ def evaluate(args, dataset):
         seg_batch = seg_batch.to(args.device)
 
         with torch.no_grad():
-            memory_bank, emb = args.model(src_batch, None, seg_batch, tgt_seg_batch, only_use_encoder=True)
+            memory_bank, emb = args.model(src_batch, None, seg_batch, None, only_use_encoder=True)
 
-        for _ in range(args.tgt_seq_length):
+        for step in range(args.tgt_seq_length):
             tgt_out_batch = tgt_in_batch
             with torch.no_grad():
-                outputs = args.model(emb, (tgt_in_batch, tgt_out_batch, src_batch), None, tgt_seg_batch, memory_bank=memory_bank)
+                outputs = args.model(emb, (tgt_in_batch, None, None), None, None, memory_bank=memory_bank)
 
             next_token_logits = outputs[:, -1]
-            next_tokens = torch.argmax(next_token_logits, dim=1).unsqueeze(1)
+            log_prob = F.log_softmax(next_token_logits, dim=-1)
+            log_prob[:,PAD_ID] = -math.inf # do not select pad
+            if step == 0:
+                log_prob[:,SEP_ID] = -math.inf # </s>
+
+            next_tokens = torch.argmax(log_prob, dim=1).unsqueeze(1)
             tgt_in_batch = torch.cat([tgt_in_batch, next_tokens], dim=1)
             tgt_seg_batch  = torch.ones(tgt_in_batch.size()[0], tgt_in_batch.size()[1], dtype=torch.long, device=args.device)
         for j in range(len(outputs)):
-            sentence = "".join([args.tokenizer.inv_vocab[token_id.item()] for token_id in tgt_in_batch[j][1:]])
+            sentence = "".join([args.tokenizer.inv_vocab[token_id.item()] for token_id in tgt_in_batch[j]])
             generated_sentences.append(sentence)
 
     w_errs = 0
@@ -200,8 +209,10 @@ def evaluate(args, dataset):
     for i, example in enumerate(dataset):
         tgt = example[2]
         tgt_token = "".join([args.tokenizer.inv_vocab[token_id] for token_id in tgt[:-2]])
-        generated_sentences[i] = generated_sentences[i].split(SEP_TOKEN)[0]
-
+        if len(generated_sentences[i].split(SEP_TOKEN)) > 1:
+            generated_sentences[i] = generated_sentences[i].split(SEP_TOKEN)[1]
+        else:
+            generated_sentences[i] = generated_sentences[i].split(SEP_TOKEN)[0]
         pred = generated_sentences[i].split("▁")
         gold = tgt_token.split(SEP_TOKEN)[0].split("▁")
         w_errs += editdistance.eval(pred, gold)

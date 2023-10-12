@@ -740,7 +740,7 @@ class AudioDataloader(Dataloader):
             self.normalize_vars = False
         if "ceptral_normalize" not in args.audio_preprocess:
             self.ceptral_normalize = False
-        if "sepcaugment" in args:
+        if "specaugment" in args:
             self.specaugment = SpecAugment(args)
 
 def utterance_cmvn(x, normalize_means=True, normalize_vars=True, local_rank=None):
@@ -795,6 +795,8 @@ class S2tDataloader(AudioDataloader):
                                          sample_frequency=self.sampling_rate)
                 if self.ceptral_normalize:
                     feature = utterance_cmvn(feature, self.normalize_means, self.normalize_vars, self.local_rank)
+                if self.specaugment is not None:
+                    feature = torch.from_numpy(self.specaugment(feature)).cuda(self.local_rank)
                 difference = self.max_audio_frames - feature.size(0)
                 if difference < 0:
                     continue
@@ -812,8 +814,6 @@ class S2tDataloader(AudioDataloader):
 
             if len(src_audio) == 0:
                 continue
-            if self.specaugment:
-                src_audio = self.specaugment(src_audio)
 
             yield  torch.stack(src_audio, 0), \
                    torch.LongTensor(tgt_out), \
