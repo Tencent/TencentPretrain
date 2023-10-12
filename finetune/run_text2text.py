@@ -61,7 +61,7 @@ class Text2text(torch.nn.Module):
         else:
             decoder_emb = self.tgt_embedding(tgt_in, tgt_seg)
             hidden = self.decoder(memory_bank, decoder_emb, (seg,))
-            loss = self.target(hidden, tgt_out, None)[0]
+            loss = self.target(hidden, tgt_out, tgt_seg)[0]
             return loss, None
 
 
@@ -101,7 +101,7 @@ def read_dataset(args, path):
             while len(tgt_in) < args.tgt_seq_length:
                 tgt_in.append(PAD_ID)
                 tgt_out.append(PAD_ID)
-                tgt_seg.append(PAD_ID)
+                tgt_seg.append(0)
 
             dataset.append((src, tgt_in, tgt_out, seg, tgt_seg))
 
@@ -141,11 +141,7 @@ def train_model(args, model, optimizer, scheduler, src_batch, tgt_in_batch, tgt_
     if torch.cuda.device_count() > 1:
         loss = torch.mean(loss)
 
-    if args.fp16:
-        with args.amp.scale_loss(loss, optimizer) as scaled_loss:
-            scaled_loss.backward()
-    else:
-        loss.backward()
+    loss.backward()
 
     optimizer.step()
     scheduler.step()
@@ -261,14 +257,6 @@ def main():
     args.logger.info("The number of training instances: {}".format(instances_num))
 
     optimizer, scheduler = build_optimizer(args, model)
-
-    if args.fp16:
-        try:
-            from apex import amp
-        except ImportError:
-            raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
-        model, optimizer = amp.initialize(model, optimizer, opt_level=args.fp16_opt_level)
-        args.amp = amp
 
     if torch.cuda.device_count() > 1:
         args.logger.info("{} GPUs are available. Let's use them.".format(torch.cuda.device_count()))

@@ -44,7 +44,7 @@ def main():
     model_opts(parser)
     parser.add_argument("--data_processor",
                         choices=["bert", "lm", "mlm", "bilm", "albert", "mt", "t5", "cls",
-                                 "prefixlm", "gsg", "bart", "cls_mlm", "vit", "vilt", "clip", "s2t", "beit", "dalle"], default="bert",
+                                 "prefixlm", "gsg", "bart", "cls_mlm", "vit", "vilt", "clip", "s2t", "beit", "dalle", "alpaca"], default="bert",
                         help="The data processor of the pretraining model.")
     parser.add_argument("--deep_init", action="store_true",
                         help="Scaling initialization of projection layers by a "
@@ -71,10 +71,23 @@ def main():
     # Deepspeed options.
     deepspeed_opts(parser)
 
+    # lora options.
+    lora_opts(parser)
+
     # Log options.
     log_opts(parser)
 
     args = parser.parse_args()
+
+    # construct lora dict parameters.
+    if args.use_lora:
+        args.lora_params = {
+            "lora_r": args.lora_r,
+            "lora_alpha": args.lora_alpha,
+            "lora_dropout": args.lora_dropout
+        }
+    else:
+        args.lora_params = None
 
     if "cls" in args.target:
         assert args.labels_num is not None, "Cls target needs the denotation of the number of labels."
@@ -102,11 +115,11 @@ def main():
         elif args.world_size == 1 and ranks_num == 1:
             # Single GPU mode.
             assert torch.cuda.is_available(), "No available GPUs."
-            args.gpu_id = args.gpu_ranks[0]
-            assert args.gpu_id < torch.cuda.device_count(), "Invalid specified GPU device."
+            args.local_rank = args.gpu_ranks[0]
+            assert args.local_rank < torch.cuda.device_count(), "Invalid specified GPU device."
             args.dist_train = False
             args.single_gpu = True
-            print("Using GPU %d for training." % args.gpu_id)
+            print("Using GPU %d for training." % args.local_rank)
         else:
             # CPU mode.
             assert ranks_num == 0, "GPUs are specified, please check the arguments."

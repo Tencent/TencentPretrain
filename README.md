@@ -58,7 +58,7 @@ TencentPretrain has the following features:
 <br/>
 
 ## Quickstart
-This section uses several commonly-used examples to demonstrate how to use TencentPretrain. More details are discussed in Instructions section. We firstly use BERT (a text pre-training model) on book review sentiment classification dataset. The dataset is collected by [this paper](http://www.cips-cl.org/static/anthology/CCL-2018/CCL-18-086.pdf) and is available [here](https://github.com/Embedding/Embedding.github.io/blob/master/extrinsic_eval_data.zip). We pre-train model on book review corpus and then fine-tune it on book review sentiment classification dataset. There are three input files: book review corpus, book review sentiment classification dataset, and vocabulary. All files are encoded in UTF-8 and included in this project.
+This section uses several commonly-used examples to demonstrate how to use TencentPretrain. More details are discussed in Instructions section. We firstly use BERT (a text pre-training model) on book review sentiment classification dataset. We pre-train model on book review corpus and then fine-tune it on book review sentiment classification dataset. There are three input files: book review corpus, book review sentiment classification dataset, and vocabulary. All files are encoded in UTF-8 and included in this project.
 
 The format of the corpus for BERT is as follows (one sentence per line and documents are delimited by empty lines)：
 ```
@@ -135,12 +135,12 @@ The above content provides basic ways of using TencentPretrain to pre-process, p
 <br/>
 
 ## Pre-training data
-This section provides links to a range of :arrow_right: [__pre-training data__](https://github.com/Tencent/TencentPretrain/wiki/Pretraining-data) :arrow_left: (in other open source projects).
+This section provides links to a range of :arrow_right: [__pre-training data__](https://github.com/Tencent/TencentPretrain/wiki/Pretraining-data) :arrow_left: .
 
 <br/>
 
 ## Downstream datasets
-This section provides links to a range of :arrow_right: [__downstream datasets__](https://github.com/Tencent/TencentPretrain/wiki/Downstream-datasets) :arrow_left: (in other open source projects). TencentPretrain can load these datasets directly.
+This section provides links to a range of :arrow_right: [__downstream datasets__](https://github.com/Tencent/TencentPretrain/wiki/Downstream-datasets) :arrow_left: . TencentPretrain can load these datasets directly.
 
 <br/>
 
@@ -191,3 +191,17 @@ Comprehensive examples of using TencentPretrain can be found in :arrow_right: [_
 
 ## Competition solutions
 TencentPretrain has been used in winning solutions of many competitions. In this section, we provide some examples of using TencentPretrain to achieve SOTA results on competitions, such as CLUE. See :arrow_right: [__competition solutions__](https://github.com/Tencent/TencentPretrain/wiki/Competition-solutions) :arrow_left: for more detailed information.
+
+<br/>
+
+## Citation
+#### If you are using the work (e.g. pre-trained models) in TencentPretrain for academic work, please cite the [system paper](https://arxiv.org/pdf/2212.06385.pdf) published in ACL 2023:
+```
+@article{zhao2023tencentpretrain,
+  title={TencentPretrain: A Scalable and Flexible Toolkit for Pre-training Models of Different Modalities},
+  author={Zhao, Zhe and Li, Yudong and Hou, Cheng and Zhao, Jing and others},
+  journal={ACL 2023},
+  pages={217},
+  year={2023}
+}
+```

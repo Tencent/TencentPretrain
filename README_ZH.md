@@ -54,7 +54,7 @@ TencentPretrain有如下几方面优势:
 <br>
 
 ## 快速上手
-这里我们通过常用的例子来简要说明如何使用TencentPretrain，更多的细节请参考使用说明章节。我们首先使用文本预训练模型BERT和书评情感分类数据集。这个数据集是由[这篇论文](http://www.cips-cl.org/static/anthology/CCL-2018/CCL-18-086.pdf)收集，并开源在[这里](https://github.com/Embedding/Embedding.github.io/blob/master/extrinsic_eval_data.zip)。我们在书评语料上对模型进行预训练，然后在书评情感分类数据集上对其进行微调。这个过程有三个输入文件：书评语料，书评情感分类数据集和中文词典。这些文件均为UTF-8编码，并被包括在这个项目中。
+这里我们通过常用的例子来简要说明如何使用TencentPretrain，更多的细节请参考使用说明章节。我们首先使用文本预训练模型BERT和书评情感分类数据集。我们在书评语料上对模型进行预训练，然后在书评情感分类数据集上对其进行微调。这个过程有三个输入文件：书评语料，书评情感分类数据集和中文词典。这些文件均为UTF-8编码，并被包括在这个项目中。
 
 BERT模型要求的预训练语料格式是一行一个句子，不同文档使用空行分隔，如下所示：
 
@@ -132,12 +132,12 @@ python3 inference/run_classifier_infer.py --load_model_path models/finetuned_mod
 <br>
 
 ## 预训练数据
-我们提供了链接，指向一系列其他项目开源的 :arrow_right: [__预训练数据__](https://github.com/Tencent/TencentPretrain/wiki/预训练数据) :arrow_left: 。
+我们提供了链接，指向一系列开源的 :arrow_right: [__预训练数据__](https://github.com/Tencent/TencentPretrain/wiki/预训练数据) :arrow_left: 。
 
 <br>
 
 ## 下游任务数据集
-我们提供了链接，指向一系列其他项目开源的 :arrow_right: [__下游任务数据集__](https://github.com/Tencent/TencentPretrain/wiki/下游任务数据集) :arrow_left: 。TencentPretrain可以直接加载这些数据集。
+我们提供了链接，指向一系列开源的 :arrow_right: [__下游任务数据集__](https://github.com/Tencent/TencentPretrain/wiki/下游任务数据集) :arrow_left: 。TencentPretrain可以直接加载这些数据集。
 
 <br>
 
@@ -186,3 +186,17 @@ TencentPretrain/
 
 ## 竞赛解决方案
 TencentPretrain已被用于许多竞赛的获奖解决方案中。在本章节中，我们提供了一些使用TencentPretrain在竞赛中获得SOTA成绩的示例，例如CLUE。更多详细信息参见 :arrow_right: [__竞赛解决方案__](https://github.com/Tencent/TencentPretrain/wiki/竞赛解决方案) :arrow_left: 。
+
+<br/>
+
+## 引用
+#### 如果您在您的学术工作中使用我们的工作（比如模型仓库中的预训练模型），可以引用我们的[论文](https://arxiv.org/pdf/2212.06385.pdf)：
+```
+@article{zhao2023tencentpretrain,
+  title={TencentPretrain: A Scalable and Flexible Toolkit for Pre-training Models of Different Modalities},
+  author={Zhao, Zhe and Li, Yudong and Hou, Cheng and Zhao, Jing and others},
+  journal={ACL 2023},
+  pages={217},
+  year={2023}
+}
+```
