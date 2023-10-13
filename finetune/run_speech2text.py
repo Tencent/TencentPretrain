@@ -62,7 +62,7 @@ class Speech2text(torch.nn.Module):
             return self.decode(emb, memory_bank, tgt, tgt_seg)
         tgt_in, tgt_out, _ = tgt
         memory_bank, emb = self.encode(src, seg)
-        
+
         if tgt_out is None:
             output = self.decode(emb, memory_bank, tgt, None)
             return None, output
@@ -76,7 +76,13 @@ class Speech2text(torch.nn.Module):
 def read_dataset(args, path):
     dataset, columns = [], {}
     padding_vector = torch.FloatTensor(args.audio_feature_size * [0.0] if args.audio_feature_size > 1 else 0.0).unsqueeze(0)
-
+    if args.model_source == "tp": # pretrained by TencentPretrain
+        first_token = CLS_TOKEN
+    elif args.model_source == "hf": # pretrained by Huggingface
+        first_token = SEP_TOKEN
+    else:
+        print("unsupported model source! The inference results may not be right")
+        first_token = SEP_TOKEN
     with open(path, mode="r", encoding="utf-8") as f:
         for line_id, line in enumerate(f):
             if line_id == 0:
@@ -85,7 +91,7 @@ def read_dataset(args, path):
                 continue
             line = line.rstrip("\r\n").split("\t")
             text, wav_path = line[columns["text"]], line[columns["wav_path"]]
-            tgt = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN]) + \
+            tgt = args.tokenizer.convert_tokens_to_ids([first_token]) + \
                 args.tokenizer.convert_tokens_to_ids(args.tokenizer.tokenize(text)) + \
                 args.tokenizer.convert_tokens_to_ids([SEP_TOKEN])
 
@@ -171,6 +177,13 @@ def evaluate(args, dataset):
     args.model.eval()
     PAD_ID = args.tokenizer.convert_tokens_to_ids([PAD_TOKEN])
     SEP_ID = args.tokenizer.convert_tokens_to_ids([SEP_TOKEN])
+    if args.model_source == "tp": # pretrained by TencentPretrain
+        first_token = CLS_TOKEN
+    elif args.model_source == "hf": # pretrained by Huggingface
+        first_token = SEP_TOKEN
+    else:
+        print("unsupported model source! The inference results may not be right")
+        first_token = SEP_TOKEN
 
     for i, (src_batch, tgt_in_batch, tgt_out_batch, seg_batch, tgt_seg_batch) in enumerate(batch_loader(args.batch_size, src, tgt_in, tgt_out, seg, tgt_seg)):
 
@@ -178,7 +191,7 @@ def evaluate(args, dataset):
         tgt_in_batch = torch.zeros(tgt_in_batch.size()[0], 1, dtype=torch.long, device=args.device)
         tgt_seg_batch  = torch.ones(tgt_in_batch.size()[0], 1, dtype=torch.long, device=args.device)
         for j in range(tgt_in_batch.size()[0]):
-            tgt_in_batch[j][0] = args.tokenizer.vocab.get(CLS_TOKEN)
+            tgt_in_batch[j][0] = args.tokenizer.vocab.get(first_token)
 
         seg_batch = seg_batch.to(args.device)
 
@@ -209,10 +222,11 @@ def evaluate(args, dataset):
     for i, example in enumerate(dataset):
         tgt = example[2]
         tgt_token = "".join([args.tokenizer.inv_vocab[token_id] for token_id in tgt[:-2]])
-        if len(generated_sentences[i].split(SEP_TOKEN)) > 1:
-            generated_sentences[i] = generated_sentences[i].split(SEP_TOKEN)[1]
+        if args.model_source == "tp":
+            generated_sentences[i] = generated_sentences[i].split(SEP_TOKEN)[0].split(CLS_TOKEN)[1]
         else:
-            generated_sentences[i] = generated_sentences[i].split(SEP_TOKEN)[0]
+            generated_sentences[i] = generated_sentences[i].split(SEP_TOKEN)[1]
+
         pred = generated_sentences[i].split("▁")
         gold = tgt_token.split(SEP_TOKEN)[0].split("▁")
         w_errs += editdistance.eval(pred, gold)
@@ -231,7 +245,8 @@ def main():
 
     parser.add_argument("--tgt_seq_length", type=int, default=50,
                         help="Output sequence length.")
-
+    parser.add_argument("--model_source", type=str, default="tp",
+                        help="pretrain model tool", choices=["tp","hf",None])
     args = parser.parse_args()
 
     # Load the hyperparameters from the config file.
@@ -292,6 +307,7 @@ def main():
                 total_loss = 0.0
 
         result = evaluate(args, read_dataset(args, args.dev_path))
+        save_model(model, args.output_model_path+"-ep"+str(epoch))
         if result < best_result:
             best_result = result
             save_model(model, args.output_model_path)
