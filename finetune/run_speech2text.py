@@ -62,7 +62,7 @@ class Speech2text(torch.nn.Module):
             return self.decode(emb, memory_bank, tgt, tgt_seg)
         tgt_in, tgt_out, _ = tgt
         memory_bank, emb = self.encode(src, seg)
-        
+
         if tgt_out is None:
             output = self.decode(emb, memory_bank, tgt, None)
             return None, output
@@ -209,10 +209,8 @@ def evaluate(args, dataset):
     for i, example in enumerate(dataset):
         tgt = example[2]
         tgt_token = "".join([args.tokenizer.inv_vocab[token_id] for token_id in tgt[:-2]])
-        if len(generated_sentences[i].split(SEP_TOKEN)) > 1:
-            generated_sentences[i] = generated_sentences[i].split(SEP_TOKEN)[1]
-        else:
-            generated_sentences[i] = generated_sentences[i].split(SEP_TOKEN)[0]
+        generated_sentences[i] = generated_sentences[i].split(CLS_TOKEN)[1].split(SEP_TOKEN)[0]
+
         pred = generated_sentences[i].split("▁")
         gold = tgt_token.split(SEP_TOKEN)[0].split("▁")
         w_errs += editdistance.eval(pred, gold)
@@ -292,6 +290,7 @@ def main():
                 total_loss = 0.0
 
         result = evaluate(args, read_dataset(args, args.dev_path))
+        save_model(model, args.output_model_path+"-ep"+str(epoch))
         if result < best_result:
             best_result = result
             save_model(model, args.output_model_path)
