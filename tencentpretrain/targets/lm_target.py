@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+from tencentpretrain import mpu
 from tencentpretrain.utils.constants import *
 
 
@@ -13,6 +14,7 @@ class LmTarget(nn.Module):
         super(LmTarget, self).__init__()
         self.vocab_size = vocab_size
         self.hidden_size = args.hidden_size
+        self.use_mp = args.use_mp
         if "label_smoothing" in args:
             self.label_smoothing = args.label_smoothing
         else:
@@ -22,8 +24,11 @@ class LmTarget(nn.Module):
         else:
             self.ignore_index = None
         self.prefix_lm_loss = args.prefix_lm_loss
-
-        self.output_layer = nn.Linear(self.hidden_size, self.vocab_size, bias=args.has_lmtarget_bias)
+        if self.use_mp:
+            self.output_layer = mpu.ColumnParallelLinear(self.hidden_size, self.vocab_size, gather_output=False,
+                                                         skip_bias_add=True, bias=False)
+        else:
+            self.output_layer = nn.Linear(self.hidden_size, self.vocab_size, bias=args.has_lmtarget_bias)
         self.softmax = nn.LogSoftmax(dim=-1)
         self.criterion = nn.NLLLoss()
 
@@ -42,30 +47,36 @@ class LmTarget(nn.Module):
         tgt_lm = tgt_lm[seg > loss_mask]
 
         output = self.output_layer(memory_bank)
-        output = self.softmax(output)
-        denominator = torch.tensor(output.size(0) + 1e-6)
-        if output.size(0) == 0:
-            correct = torch.tensor(0.0)
+        if self.use_mp:
+            losses = mpu.vocab_parallel_cross_entropy(output, tgt_lm)
+            loss = torch.sum(losses.view(-1)) / len(losses)
+
+            return loss
         else:
-            correct = torch.sum((output.argmax(dim=-1).eq(tgt_lm)).float())
-        if self.label_smoothing is None:
-            loss = self.criterion(output, tgt_lm)
-        else:
-            if tgt_lm.dim() == output.dim() - 1:
-                tgt_lm = tgt_lm.unsqueeze(-1)
-            nll_loss = -output.gather(dim=-1, index=tgt_lm)
-            smooth_loss = -output.sum(dim=-1, keepdim=True)
-            if self.ignore_index is not None:
-                pad_mask = tgt_lm.eq(self.ignore_index)
-                nll_loss.masked_fill_(pad_mask, 0.0)
-                smooth_loss.masked_fill_(pad_mask, 0.0)
+            output = self.softmax(output)
+            denominator = torch.tensor(output.size(0) + 1e-6)
+            if output.size(0) == 0:
+                correct = torch.tensor(0.0)
             else:
-                nll_loss = nll_loss.squeeze(-1)
-                smooth_loss = smooth_loss.squeeze(-1)
-            nll_loss = nll_loss.mean()
-            smooth_loss = smooth_loss.mean()
-            eps_i = self.label_smoothing / (output.size(-1) - 1)
-            loss = (1.0 - self.label_smoothing - eps_i) * nll_loss + eps_i * smooth_loss
+                correct = torch.sum((output.argmax(dim=-1).eq(tgt_lm)).float())
+            if self.label_smoothing is None:
+                loss = self.criterion(output, tgt_lm)
+            else:
+                if tgt_lm.dim() == output.dim() - 1:
+                    tgt_lm = tgt_lm.unsqueeze(-1)
+                nll_loss = -output.gather(dim=-1, index=tgt_lm)
+                smooth_loss = -output.sum(dim=-1, keepdim=True)
+                if self.ignore_index is not None:
+                    pad_mask = tgt_lm.eq(self.ignore_index)
+                    nll_loss.masked_fill_(pad_mask, 0.0)
+                    smooth_loss.masked_fill_(pad_mask, 0.0)
+                else:
+                    nll_loss = nll_loss.squeeze(-1)
+                    smooth_loss = smooth_loss.squeeze(-1)
+                nll_loss = nll_loss.mean()
+                smooth_loss = smooth_loss.mean()
+                eps_i = self.label_smoothing / (output.size(-1) - 1)
+                loss = (1.0 - self.label_smoothing - eps_i) * nll_loss + eps_i * smooth_loss
 
         return loss, correct, denominator
 

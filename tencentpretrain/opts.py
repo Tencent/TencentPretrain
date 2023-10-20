@@ -226,6 +226,21 @@ def deepspeed_opts(parser):
     parser.add_argument("--local_rank", type=int, required=False)
 
 
+def mp_opts(parser):
+    parser.add_argument("--use_mp", action="store_true",
+                        help=".")
+    parser.add_argument("--tensor_model_parallel_size", type=int, default=1,
+                        help="Degree of tensor model parallelism.")
+    parser.add_argument("--use_pipe", action="store_true",
+                        help=".")
+    parser.add_argument("--pipeline_model_parallel_size", type=int, default=1,
+                        help="Degree of pipeline model parallelism.")
+    parser.add_argument("--virtual_pipeline_model_parallel_size", type=int, default=None,
+                        help=".")
+    parser.add_argument("--distribute_checkpointed_activations", action="store_true",
+                        help=".")
+                        
+
 def adv_opts(parser):
     parser.add_argument("--use_adv", action="store_true",
                         help=".")

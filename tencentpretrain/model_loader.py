@@ -1,4 +1,5 @@
 import torch
+from tencentpretrain import mpu
 
 
 def load_model(model, model_path, lora_pretrained_model_path=None):
@@ -58,3 +59,18 @@ def _load_state_dict_into_model(model_to_load, model_path, start_prefix=""):
     del state_dict
 
     return model_to_load
+
+
+def load_mp_model(model, model_path):
+
+    prefix = os.listdir(model_path)
+    weight_list = sorted([os.path.join(model_path, f) for f in prefix])
+
+    tp_rank = mpu.get_tensor_model_parallel_rank()
+
+    if hasattr(model, "module"):
+        model.module.load_state_dict(torch.load(weight_list[tp_rank], map_location="cpu")['module'], strict=False)
+    else:
+        model.load_state_dict(torch.load(weight_list[tp_rank], map_location="cpu"), strict=True)
+    
+    return model

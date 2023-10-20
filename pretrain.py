@@ -42,6 +42,7 @@ def main():
 
     # Model options.
     model_opts(parser)
+    mp_opts(parser)
     parser.add_argument("--data_processor",
                         choices=["bert", "lm", "mlm", "bilm", "albert", "mt", "t5", "cls",
                                  "prefixlm", "gsg", "bart", "cls_mlm", "vit", "vilt", "clip", "s2t", "beit", "dalle", "alpaca"], default="bert",
