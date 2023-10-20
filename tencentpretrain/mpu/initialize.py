@@ -247,9 +247,7 @@ def get_tensor_model_parallel_world_size():
 
 
 def get_model_parallel_world_size():
-#    assert (
-#        get_pipeline_model_parallel_world_size() == 1
-#    ), "legacy get_model_parallel_world_size is only supported if PP is disabled"
+
     return get_tensor_model_parallel_world_size()
 
 
@@ -282,9 +280,7 @@ def get_tensor_model_parallel_rank():
 
 
 def get_model_parallel_rank():
-#    assert (
-#        get_pipeline_model_parallel_world_size() == 1
-#    ), "legacy get_model_parallel_rank is only supported if PP is disabled"
+
     return get_tensor_model_parallel_rank()
 
 

@@ -1,4 +1,5 @@
 import torch.nn as nn
+from tencentpretrain import mpu
 from tencentpretrain.utils import *
 
 class PositionwiseFeedForward(nn.Module):

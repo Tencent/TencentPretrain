@@ -159,16 +159,16 @@ def train_and_validate(args):
     args.vocab = args.tokenizer.vocab
 
     if args.deepspeed:
-        worker(args.local_rank, None, args)
+        worker(args.local_rank, args)
     elif args.dist_train:
         # Multiprocessing distributed mode.
-        mp.spawn(worker, nprocs=args.ranks_num, args=(args.gpu_ranks, args), daemon=False)
+        mp.spawn(worker, nprocs=args.ranks_num, args=(args), daemon=False)
     elif args.single_gpu:
         # Single GPU mode.
-        worker(args.local_rank, None, args)
+        worker(args.local_rank, args)
     else:
         # CPU mode.
-        worker(None, None, args)
+        worker(None, args)
 
 
 class Trainer(object):
@@ -343,8 +343,8 @@ class AlbertTrainer(BertTrainer):
 
 
 class LmTrainer(Trainer):
-        def __init__(self, args):
-        super(MlmTrainer, self).__init__(args)
+    def __init__(self, args):
+        super(LmTrainer, self).__init__(args)
         self.total_correct = 0.0
         self.total_denominator = 0.0
 
@@ -674,31 +674,24 @@ str2trainer = {"bert": BertTrainer, "mlm": MlmTrainer, "lm": LmTrainer,
                "beit": BeitTrainer, "dalle": DalleTrainer, "alpaca": AlpacaTrainer}
 
 
-def worker(local_rank, gpu_ranks, args):
+def worker(local_rank, args):
     """
     Args:
         local_rank: The id of GPU for single GPU mode;
                     The id of process (and GPU) for multiprocessing distributed mode.
-        gpu_ranks: List of ranks of each process.
     """
     set_seed(args.seed)
 
     # Get logger
     args.logger = init_logger(args)
 
-    if args.deepspeed:
-        import deepspeed
-        deepspeed.init_distributed(dist_backend=args.backend)
-        global_rank = dist.get_rank()
-    elif args.dist_train:
-        global_rank = gpu_ranks[local_rank]
-    elif args.single_gpu:
-        global_rank = None
-    else:
-        global_rank = None
+    # Env initialize.
+    initialize(args)
+    global_rank = args.global_rank
 
     # Build model.
     model_for_training, model_for_dataloader = model_init(args)
+    
     # Build optimizer.
     custom_optimizer, custom_scheduler, optimizer_grouped_parameters = optimizer_init(args, model_for_training)
 
@@ -726,11 +719,6 @@ def worker(local_rank, gpu_ranks, args):
         scheduler = custom_scheduler
 
         if args.dist_train:
-            # Initialize multiprocessing distributed training environment.
-            dist.init_process_group(backend=args.backend,
-                                    init_method=args.master_ip,
-                                    world_size=args.world_size,
-                                    rank=global_rank)
             model_for_training = DistributedDataParallel(model_for_training, device_ids=[local_rank], find_unused_parameters=True)
             if model_for_dataloader is not None:
                 model_for_dataloader = DistributedDataParallel(model_for_dataloader, device_ids=[local_rank], find_unused_parameters=False)
@@ -742,9 +730,9 @@ def worker(local_rank, gpu_ranks, args):
         if model_for_dataloader is not None:
             model_for_dataloader = model_for_dataloader.module
         if args.use_mp:
-            train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, rank,
+            train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, global_rank,
                                                                args.world_size // (args.tensor_model_parallel_size * args.pipeline_model_parallel_size),
-                                                               gpu_id, True, model_for_dataloader)
+                                                               local_rank, True, model_for_dataloader)
         else:
             train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, global_rank, args.world_size, local_rank, True, model_for_dataloader)
     else:

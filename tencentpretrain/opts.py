@@ -224,6 +224,7 @@ def deepspeed_opts(parser):
     parser.add_argument("--resume_from_checkpoint", type=str, default=None,
                         help="resume form deepspeed format checkpoint (only support zero1&2).")
     parser.add_argument("--local_rank", type=int, required=False)
+    parser.add_argument("--global_rank", type=int, required=False)
 
 
 def mp_opts(parser):

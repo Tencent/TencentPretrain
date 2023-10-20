@@ -26,7 +26,7 @@ class Embedding(nn.Module):
             if i == 0:
                 emb = embedding(src, seg)
             else:
-                emb += embedding(src, seg)
+                emb = embedding(src, seg) + emb.clone()
 
         if not self.remove_embedding_layernorm:
             emb = self.layer_norm(emb)

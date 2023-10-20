@@ -1,6 +1,7 @@
 import math
 import torch
 import torch.nn as nn
+from tencentpretrain import mpu
 from tencentpretrain.utils.rope import apply_rotary_emb
 from tencentpretrain.utils.lora import LoraLinear
 
@@ -158,10 +159,10 @@ class ParallelMultiHeadedAttention(nn.Module):
         self.inner_hidden_size = heads_num * attention_head_size
         # print('has_bias',has_bias)
         self.linear_layers = nn.ModuleList(
-            [mpu.ColumnParallelLinear(hidden_size, self.inner_hidden_size, skip_bias_add= False if has_bias else True, gather_output=False) for _ in range(3)]
+            [mpu.ColumnParallelLinear(hidden_size, self.inner_hidden_size, skip_bias_add=False if has_bias else True, gather_output=False) for _ in range(3)]
         )
         self.dropout = nn.Dropout(dropout)
-        self.final_linear = mpu.RowParallelLinear(self.inner_hidden_size, hidden_size, bias=has_bias, input_is_parallel=True, skip_bias_add= False if has_bias else True)
+        self.final_linear = mpu.RowParallelLinear(self.inner_hidden_size, hidden_size, bias=has_bias, input_is_parallel=True, skip_bias_add=False if has_bias else True)
 
     def forward(self, key, value, query, mask, position_bias=None, has_residual_attention=False, prev_attn=None,
                 freqs_cis=None):
