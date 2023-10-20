@@ -686,12 +686,13 @@ def worker(local_rank, args):
     args.logger = init_logger(args)
 
     # Env initialize.
+    args.local_rank = local_rank
     initialize(args)
     global_rank = args.global_rank
 
     # Build model.
     model_for_training, model_for_dataloader = model_init(args)
-    
+
     # Build optimizer.
     custom_optimizer, custom_scheduler, optimizer_grouped_parameters = optimizer_init(args, model_for_training)
 

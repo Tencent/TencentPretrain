@@ -53,11 +53,11 @@ def initialize(args):
             args.global_rank = torch.distributed.get_rank()
     elif args.dist_train:
         # Initialize multiprocessing distributed training environment.
+        args.global_rank = args.gpu_ranks[args.local_rank]
         torch.distributed.init_process_group(backend=args.backend,
                                 init_method=args.master_ip,
                                 world_size=args.world_size,
                                 rank=args.global_rank)
-        args.global_rank = args.gpu_ranks[local_rank]
     elif args.single_gpu:
         args.global_rank = None
     else:
