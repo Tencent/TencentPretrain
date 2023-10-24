@@ -19,7 +19,6 @@ import time
 import datetime
 import numpy as np
 import torch
-import deepspeed
 from tencentpretrain import mpu
 from tencentpretrain.mpu import (
     set_tensor_model_parallel_rank,
@@ -151,7 +150,7 @@ def setup_deepspeed_random_and_activation_checkpointing(args):
         else num_layers + 1
     )
 
-
+    import deepspeed
     deepspeed.checkpointing.configure(
         mpu
     )
