@@ -50,15 +50,10 @@ class LmTarget(nn.Module):
         if self.use_mp:
             losses = mpu.vocab_parallel_cross_entropy(output, tgt_lm)
             loss = torch.sum(losses.view(-1)) / len(losses)
-
-            return loss
         else:
             output = self.softmax(output)
             denominator = torch.tensor(output.size(0) + 1e-6)
-            if output.size(0) == 0:
-                correct = torch.tensor(0.0)
-            else:
-                correct = torch.sum((output.argmax(dim=-1).eq(tgt_lm)).float())
+
             if self.label_smoothing is None:
                 loss = self.criterion(output, tgt_lm)
             else:
@@ -78,7 +73,7 @@ class LmTarget(nn.Module):
                 eps_i = self.label_smoothing / (output.size(-1) - 1)
                 loss = (1.0 - self.label_smoothing - eps_i) * nll_loss + eps_i * smooth_loss
 
-        return loss, correct, denominator
+        return loss
 
     def forward(self, memory_bank, tgt, seg):
         """
@@ -88,10 +83,8 @@ class LmTarget(nn.Module):
 
         Returns:
             loss: Language modeling loss.
-            correct: Number of words that are predicted correctly.
-            denominator: Number of predicted words.
         """
         # Language modeling (LM) with full softmax prediction.
-        loss, correct, denominator = self.lm(memory_bank, tgt, seg)
+        loss = self.lm(memory_bank, tgt, seg)
 
-        return loss, correct, denominator
+        return loss

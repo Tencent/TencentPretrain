@@ -359,7 +359,6 @@ class LmTrainer(Trainer):
 
     def report_and_reset_stats(self):
         done_tokens = self.batch_size * self.seq_length * self.report_steps
-        dp_group = mpu.get_data_parallel_group()
         if self.dist_train:
             done_tokens *= self.world_size
             done_tokens = done_tokens // (self.tensor_model_parallel_size * self.pipeline_model_parallel_size)
