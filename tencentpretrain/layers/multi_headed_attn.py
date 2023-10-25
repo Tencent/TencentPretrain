@@ -106,37 +106,11 @@ class MultiHeadedAttention(nn.Module):
         if freqs_cis is not None:
             query, key = apply_rotary_emb(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
 
-        scores = torch.matmul(query, key.transpose(-2, -1))
-
-        if position_bias is not None:
-            scores = scores + position_bias
-
-        if self.with_scale:
-            if self.layer_number is not None:
-                scores = scores * (1.0 / self.norm_factor)
-            else:
-                scores = scores / math.sqrt(float(per_head_size))
-        if alibi is not None:
-            scores = scores.reshape((-1, scores.shape[-2], scores.shape[-1]))
-            scores += (1.0 / self.layer_number) * alibi
-            scores = scores.view(-1, heads_num, scores.shape[-2], scores.shape[-1])
-
-        scores = scores + mask.type_as(scores)
-
-        # scaled softmax
-        if self.layer_number is not None:
-            scores = (scores * self.layer_number) + mask
-            scores = torch.max(scores, torch.tensor(-10000))
-
         prev_attn_out = None
+        output = F.scaled_dot_product_attention(
+            query, key, value, None, 0.0, is_causal=True
+        )
+        output = unshape(output)
 
-        if has_residual_attention:
-            if prev_attn is not None:
-                scores += prev_attn
-            prev_attn_out = scores
-
-        probs = nn.Softmax(dim=-1)(scores)
-        probs = self.dropout(probs)
-        output = unshape(torch.matmul(probs, value))
         output = self.final_linear(output)
         return output, prev_attn_out
