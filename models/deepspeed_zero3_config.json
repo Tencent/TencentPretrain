@@ -16,12 +16,8 @@
     "top_modules": 3,
     "detailed": true
   },
-  "fp16": {
-    "enabled": true,
-    "loss_scale": 0,
-    "loss_scale_window": 1000,
-    "hysteresis": 2,
-    "min_loss_scale": 1
+  "bf16": {
+    "enabled": true
   },
   "zero_optimization": {
       "stage": 3,
