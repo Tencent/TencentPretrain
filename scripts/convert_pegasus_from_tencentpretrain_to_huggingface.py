@@ -3,6 +3,7 @@ import os
 import argparse
 import collections
 import torch
+import math
 
 tencentpretrain_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, tencentpretrain_dir)
@@ -18,6 +19,7 @@ parser.add_argument("--output_model_path", type=str, default="models/output_mode
                     help=".")
 parser.add_argument("--layers_num", type=int, default=12, help=".")
 parser.add_argument("--decoder_layers_num", type=int, default=12, help=".")
+parser.add_argument("--max_seq_length", type=int, default=1024, help=".")
 
 args = parser.parse_args()
 
@@ -26,8 +28,21 @@ input_model = torch.load(args.input_model_path)
 output_model = collections.OrderedDict()
 
 output_model["model.shared.weight"] = input_model["embedding.word.embedding.weight"]
-output_model["model.encoder.embed_positions.weight"] = input_model["embedding.sinusoidalpos.pe"].squeeze(1)
-output_model["model.decoder.embed_positions.weight"] = input_model["tgt_embedding.sinusoidalpos.pe"].squeeze(1)
+
+emb_size = input_model["embedding.word.embedding.weight"].shape[1]
+pe = torch.zeros(args.max_seq_length, emb_size)
+position = torch.arange(0, args.max_seq_length).unsqueeze(1)
+div_term = torch.exp(
+    (
+        torch.arange(0, emb_size, 2, dtype=torch.float)
+        *- (math.log(10000.0) / emb_size)
+    )
+)
+pe[:, 0::2] = torch.sin(position.float() * div_term)
+pe[:, 1::2] = torch.cos(position.float() * div_term)
+
+output_model["model.encoder.embed_positions.weight"] = pe
+output_model["model.decoder.embed_positions.weight"] = pe
 output_model["model.encoder.embed_tokens.weight"] = input_model["embedding.word.embedding.weight"]
 output_model["model.decoder.embed_tokens.weight"] = input_model["tgt_embedding.word.embedding.weight"]
 output_model["lm_head.weight"] = input_model["target.lm.output_layer.weight"]
