@@ -5,6 +5,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel
 from tencentpretrain import mpu
+from tencentpretrain.initialize import init_env
 from tencentpretrain.model_loader import _load_state_dict_into_model, load_model
 from tencentpretrain.model_saver import save_model
 from tencentpretrain.model_builder import build_model
@@ -14,7 +15,7 @@ from tencentpretrain.utils import *
 from tencentpretrain.utils.seed import set_seed
 
 
-def model_init(args):
+def init_model(args):
     if args.deepspeed and args.use_mp:
         import deepspeed
         with deepspeed.zero.Init(data_parallel_group=mpu.get_data_parallel_group(),
@@ -113,7 +114,7 @@ def model_init(args):
     return model_for_training, model_for_dataloader
 
 
-def optimizer_init(args,model_for_training):
+def init_optimizer(args, model_for_training):
     param_optimizer = list(model_for_training.named_parameters())
     if args.use_lora:
         optimizer_grouped_parameters = [
@@ -144,6 +145,7 @@ def optimizer_init(args,model_for_training):
         custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps * args.warmup, args.total_steps * args.decay, args.total_steps)
     else:
         custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps * args.warmup, args.total_steps)
+
     return custom_optimizer, custom_scheduler, optimizer_grouped_parameters
 
 
@@ -159,16 +161,16 @@ def train_and_validate(args):
     args.vocab = args.tokenizer.vocab
 
     if args.deepspeed:
-        worker(args.local_rank, args)
+        worker(args.local_rank, None, args)
     elif args.dist_train:
         # Multiprocessing distributed mode.
-        mp.spawn(worker, nprocs=args.ranks_num, args=(args), daemon=False)
+        mp.spawn(worker, nprocs=args.ranks_num, args=(args.gpu_ranks, args), daemon=False)
     elif args.single_gpu:
         # Single GPU mode.
-        worker(args.local_rank, args)
+        worker(args.local_rank, None, args)
     else:
         # CPU mode.
-        worker(None, args)
+        worker(None, None, args)
 
 
 class Trainer(object):
@@ -673,7 +675,7 @@ str2trainer = {"bert": BertTrainer, "mlm": MlmTrainer, "lm": LmTrainer,
                "beit": BeitTrainer, "dalle": DalleTrainer, "alpaca": AlpacaTrainer}
 
 
-def worker(local_rank, args):
+def worker(local_rank, gpu_ranks, args):
     """
     Args:
         local_rank: The id of GPU for single GPU mode;
@@ -690,10 +692,10 @@ def worker(local_rank, args):
     global_rank = args.global_rank
 
     # Build model.
-    model_for_training, model_for_dataloader = model_init(args)
+    model_for_training, model_for_dataloader = init_model(args)
 
     # Build optimizer.
-    custom_optimizer, custom_scheduler, optimizer_grouped_parameters = optimizer_init(args, model_for_training)
+    custom_optimizer, custom_scheduler, optimizer_grouped_parameters = init_optimizer(args, model_for_training)
 
     if args.deepspeed:
         model_for_training, optimizer, _, scheduler = deepspeed.initialize(

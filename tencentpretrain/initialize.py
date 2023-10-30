@@ -26,7 +26,7 @@ from tencentpretrain.mpu import (
 )
 
 
-def initialize(args):
+def init_env(args):
 
     def finish_mpu_init():
         args = get_args()
