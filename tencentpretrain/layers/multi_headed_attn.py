@@ -206,11 +206,7 @@ class ParallelMultiHeadedAttention(nn.Module):
                    transpose(1, 2). \
                    contiguous(). \
                    view(batch_size, seq_length, -1)
-        query, key, value = [l(x). \
-                             view(batch_size, seq_length, -1, per_head_size). \
-                             transpose(1, 2) \
-                             for l, x in zip(self.linear_layers, (query, key, value))
-                            ]
+
         query, key, value = [linear_layer(x) for linear_layer, x in zip(self.linear_layers, [query, key, value])]
 
         query = query.view(batch_size, seq_length, -1, per_head_size)

@@ -10,5 +10,5 @@ str2feedforward = {"gated": GatedFeedForward, "dense": PositionwiseFeedForward}
 
 str2parallelfeedforward = {"gated": ParallelGatedFeedForward, "dense": ParallelPositionwiseFeedForward}
 
-__all__ = ["T5LayerNorm", "RMSNorm", "LayerNorm", "GatedFeedForward", "PositionwiseFeedForward",
-           "str2layernorm", "str2feedforward"]
+__all__ = ["T5LayerNorm", "RMSNorm", "LayerNorm", "GatedFeedForward", "PositionwiseFeedForward", "ParallelGatedFeedForward",
+           "ParallelPositionwiseFeedForward", "str2layernorm", "str2feedforward", "str2parallelfeedforward"]

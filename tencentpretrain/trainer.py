@@ -6,13 +6,14 @@ import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel
 from tencentpretrain import mpu
 from tencentpretrain.initialize import init_env
-from tencentpretrain.model_loader import _load_state_dict_into_model, load_model
+from tencentpretrain.model_loader import _load_state_dict_into_model, load_model, load_mp_model
 from tencentpretrain.model_saver import save_model
 from tencentpretrain.model_builder import build_model
 from tencentpretrain.utils.logging import init_logger
 from tencentpretrain.utils.optimizers import *
 from tencentpretrain.utils import *
 from tencentpretrain.utils.seed import set_seed
+from tencentpretrain.initialize import *
 
 
 def init_model(args):
@@ -73,7 +74,7 @@ def init_model(args):
             # Initialize with pretrained model.
             if args.deepspeed and args.enable_zero3:
                 if os.path.isdir(args.pretrained_model_path):
-                    index_filename = os.path.join(args.pretrained_model_path, 'pytorch_model.bin.index.json')
+                    index_filename = os.path.join(args.pretrained_model_path, "tencentpretrain_model.bin.index.json")
                     with open(index_filename, "r") as f:
                         index = json.loads(f.read())
                     shard_filenames = sorted(set(index["weight_map"].values()))
@@ -132,6 +133,7 @@ def init_optimizer(args, model_for_training):
 
     if args.optimizer in ["adamw"]:
         if args.deepspeed:
+            import deepspeed
             custom_optimizer = deepspeed.ops.adam.DeepSpeedCPUAdam(optimizer_grouped_parameters, lr=args.learning_rate, bias_correction=False)
         else:
             custom_optimizer = str2optimizer[args.optimizer](optimizer_grouped_parameters, lr=args.learning_rate, correct_bias=False)
@@ -688,7 +690,7 @@ def worker(local_rank, gpu_ranks, args):
 
     # Env initialize.
     args.local_rank = local_rank
-    initialize(args)
+    init_env(args)
     global_rank = args.global_rank
 
     # Build model.
@@ -698,6 +700,7 @@ def worker(local_rank, gpu_ranks, args):
     custom_optimizer, custom_scheduler, optimizer_grouped_parameters = init_optimizer(args, model_for_training)
 
     if args.deepspeed:
+        import deepspeed
         model_for_training, optimizer, _, scheduler = deepspeed.initialize(
                                                     model=model_for_training,
                                                     model_parameters=optimizer_grouped_parameters,
