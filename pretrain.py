@@ -33,6 +33,8 @@ def main():
                         help="The buffer size of instances in memory.")
     parser.add_argument("--labels_num", type=int, required=False,
                         help="Number of prediction labels.")
+    parser.add_argument("--skip_data_num", type=int, default=0,
+                        help="The buffer size of instances in memory.")
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout value.")
     parser.add_argument("--seed", type=int, default=7, help="Random seed.")
 
