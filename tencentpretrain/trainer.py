@@ -661,11 +661,11 @@ class BeitTrainer(MlmTrainer):
         return loss
 
 
-class DalleTrainer(LmTrainer):
+class DalleTrainer(MlmTrainer):
     pass
 
 
-class AlpacaTrainer(LmTrainer):
+class AlpacaTrainer(MlmTrainer):
     pass
 
 
