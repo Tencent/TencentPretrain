@@ -707,7 +707,7 @@ def worker(local_rank, gpu_ranks, args):
                                                     args=args,
                                                     optimizer=custom_optimizer,
                                                     lr_scheduler=custom_scheduler,
-                                                    mpu=None,
+                                                    mpu=mpu if args.use_mp else None,
                                                     dist_init_required=False)
         if args.resume_from_checkpoint is not None:
             load_path, _ = model_for_training.load_checkpoint(
