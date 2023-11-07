@@ -9,7 +9,7 @@ parser.add_argument("--input_model_path", type=str, default="models/input_model"
 parser.add_argument("--output_model_path", type=str, default="models/output_model",
                         help=".")
 parser.add_argument("--layers_num", type=int, default=32)
-parser.add_argument("--tp_size", type=int, default=4)
+parser.add_argument("--tensor_model_parallel_size", type=int, default=4)
 
 
 args = parser.parse_args()
@@ -20,7 +20,7 @@ if not os.path.exists(args.output_model_path):
 
 output_model=torch.load(os.path.join(args.input_model_path,'mp_rank_00_model_states.pt'),map_location='cpu')["module"]
 
-for n in range(1,args.tp_size):
+for n in range(1,args.tensor_model_parallel_size):
     index=str(n) if len(str(n))==2 else '0'+str(n)
     model_name=f"mp_rank_{index}_model_states.pt"
     model_piece = torch.load(os.path.join(args.input_model_path,model_name),map_location="cpu")["module"]
