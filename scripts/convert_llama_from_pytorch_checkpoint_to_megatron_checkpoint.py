@@ -10,7 +10,7 @@ parser.add_argument("--input_model_path", type=str, default="models/input_model.
 parser.add_argument("--output_model_path", type=str, default="models/output_model",
                         help=".")
 parser.add_argument("--layers_num", type=int, default=32)
-parser.add_argument("--tp_size", type=int, default=4)
+parser.add_argument("--tensor_model_parallel_size", type=int, default=4)
 parser.add_argument("--hidden_size", type=int, default=4096)
 parser.add_argument("--feedforward_size", type=int, default=11008)
 
@@ -22,13 +22,13 @@ if not os.path.exists(args.output_model_path):
     print('创建路径',args.output_model_path)
     os.mkdir(args.output_model_path)
 
-seg_feed_size=args.feedforward_size // args.tp_size
-seg_hidden_size = args.hidden_size // args.tp_size
-seg_word_size=input_model["embedding.word.embedding.weight"].size()[0] // args.tp_size
+seg_feed_size=args.feedforward_size // args.tensor_model_parallel_size
+seg_hidden_size = args.hidden_size // args.tensor_model_parallel_size
+seg_word_size=input_model["embedding.word.embedding.weight"].size()[0] // args.tensor_model_parallel_size
 
-for n in range(args.tp_size):
+for n in range(args.tensor_model_parallel_size):
     model_piece=collections.OrderedDict()
-    seg_dim=input_model["embedding.word.embedding.weight"].size()[0]//args.tp_size
+    seg_dim=input_model["embedding.word.embedding.weight"].size()[0]//args.tensor_model_parallel_size
     model_piece["embedding.word.embedding.weight"] = input_model["embedding.word.embedding.weight"][n* seg_dim :(n+1) * seg_dim,:]
     
     for i in range(args.layers_num):
