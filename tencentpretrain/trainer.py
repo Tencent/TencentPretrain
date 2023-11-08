@@ -17,63 +17,43 @@ from tencentpretrain.initialize import *
 
 
 def init_model(args):
-    if args.deepspeed and args.use_mp:
+    if args.deepspeed:
         import deepspeed
-        with deepspeed.zero.Init(data_parallel_group=mpu.get_data_parallel_group(),
-                                 remote_device=None,
-                                 config_dict_or_path=args.deepspeed_config,
-                                 enabled=args.enable_zero3 == 3,
-                                 mpu=mpu):
+    
+        with deepspeed.zero.Init(data_parallel_group=mpu.get_data_parallel_group() if args.use_mp else None,
+                            remote_device=None,
+                            config_dict_or_path=args.deepspeed_config,
+                            enabled=args.enable_zero3 == 3,
+                            mpu=mpu if args.use_mp else None ):
             model_for_training = build_model(args)
-            if args.pretrained_model_path is not None:
-                # Initialize with pretrained model.
-                model_for_training = load_mp_model(model_for_training, args.pretrained_model_path)
-            else:
-                # Initialize with normal distribution.
-                if args.deep_init:
-                    scaled_factor = 1 / math.sqrt(2.0 * args.layers_num)
-                    for n, p in list(model_for_training.named_parameters()):
-                        if "gamma" not in n and "beta" not in n:
-                            if "linear_2.weight" in n or "final_linear.weight" in n:
-                                p.data.normal_(0, 0.02 * scaled_factor)
-                            elif "linear_2.bias" in n or "final_linear.bias" in n:
-                                p.data.zero_()
-                            else:
-                                p.data.normal_(0, 0.02)
-                else:
-                    for n, p in list(model_for_training.named_parameters()):
-                        if "gamma" not in n and "beta" not in n:
-                            p.data.normal_(0, 0.02)
-        for param in model_for_training.parameters():
-            mpu.set_defaults_if_not_set_tensor_model_parallel_attributes(param)
+        if args.use_mp:
+            for param in model_for_training.parameters():
+                mpu.set_defaults_if_not_set_tensor_model_parallel_attributes(param)
 
-        if mpu.get_data_parallel_rank() == 0:
-            print(
-                " > number of parameters on (tensor, pipeline) "
-                "model parallel rank ({}, {}): {}".format(
-                    mpu.get_tensor_model_parallel_rank(),
-                    mpu.get_pipeline_model_parallel_rank(),
-                    sum(
-                        [
-                            sum([p.ds_numel if hasattr(p, "ds_id") else p.nelement() for p in
-                                 model_for_training.parameters()])
-                        ]
+            if mpu.get_data_parallel_rank() == 0:
+                print(
+                    " > number of parameters on (tensor, pipeline) "
+                    "model parallel rank ({}, {}): {}".format(
+                        mpu.get_tensor_model_parallel_rank(),
+                        mpu.get_pipeline_model_parallel_rank(),
+                        sum(
+                            [
+                                sum([p.ds_numel if hasattr(p, "ds_id") else p.nelement() for p in
+                                    model_for_training.parameters()])
+                            ]
+                        ),
                     ),
-                ),
-                flush=True,
-            )
+                    flush=True,
+                )
+                
     else:
-        if args.deepspeed and args.enable_zero3:
-            import deepspeed
-            with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
-                model_for_training = build_model(args)
-        else:
-            model_for_training = build_model(args)
+        model_for_training = build_model(args)
         # Load or initialize parameters.
-        if args.pretrained_model_path is not None:
-            # Initialize with pretrained model.
-            if args.deepspeed and args.enable_zero3:
-                if os.path.isdir(args.pretrained_model_path):
+    if args.pretrained_model_path is not None and args.resume_from_checkpoint is None:
+        # Initialize with pretrained model.
+    
+        if args.deepspeed and args.enable_zero3:
+            if os.path.isdir(args.pretrained_model_path):
                     index_filename = os.path.join(args.pretrained_model_path, "tencentpretrain_model.bin.index.json")
                     with open(index_filename, "r") as f:
                         index = json.loads(f.read())
@@ -81,30 +61,31 @@ def init_model(args):
                     shard_filenames = [os.path.join(args.pretrained_model_path, f) for f in shard_filenames]
                     for shard_file in shard_filenames:
                         model_for_training = _load_state_dict_into_model(model_for_training, shard_file, "")
-                else:
+            else:
                     model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path, "")
                     if args.lora_pretrained_model_path is not None:
-                        model_for_training = _load_state_dict_into_model(model_for_training,
-                                                                         args.lora_pretrained_model_path, "")
-            else:
-                model_for_training = load_model(model_for_training, args.pretrained_model_path,
-                                                args.lora_pretrained_model_path)
+                        model_for_training = _load_state_dict_into_model(model_for_training, args.lora_pretrained_model_path, "")
+        elif args.deepspeed and args.use_mp:
+            model_for_training = load_mp_model(model_for_training, args.pretrained_model_path)
         else:
-            # Initialize with normal distribution.
-            if args.deep_init:
-                scaled_factor = 1 / math.sqrt(2.0 * args.layers_num)
-                for n, p in list(model_for_training.named_parameters()):
-                    if "gamma" not in n and "beta" not in n:
-                        if "linear_2.weight" in n or "final_linear.weight" in n:
-                            p.data.normal_(0, 0.02 * scaled_factor)
-                        elif "linear_2.bias" in n or "final_linear.bias" in n:
-                            p.data.zero_()
-                        else:
-                            p.data.normal_(0, 0.02)
-            else:
-                for n, p in list(model_for_training.named_parameters()):
-                    if "gamma" not in n and "beta" not in n:
+            model_for_training = load_model(model_for_training, args.pretrained_model_path,
+                                            args.lora_pretrained_model_path)
+    else:
+        # Initialize with normal distribution.
+        if args.deep_init:
+            scaled_factor = 1 / math.sqrt(2.0 * args.layers_num)
+            for n, p in list(model_for_training.named_parameters()):
+                if "gamma" not in n and "beta" not in n:
+                    if "linear_2.weight" in n or "final_linear.weight" in n:
+                        p.data.normal_(0, 0.02 * scaled_factor)
+                    elif "linear_2.bias" in n or "final_linear.bias" in n:
+                        p.data.zero_()
+                    else:
                         p.data.normal_(0, 0.02)
+        else:
+            for n, p in list(model_for_training.named_parameters()):
+                if "gamma" not in n and "beta" not in n:
+                    p.data.normal_(0, 0.02)
 
     if args.vqgan_model_path is not None:
         from tencentpretrain.utils.image_tokenizer import build_vqgan_model
@@ -113,7 +94,7 @@ def init_model(args):
         model_for_dataloader = None
 
     return model_for_training, model_for_dataloader
-
+    
 
 def init_optimizer(args, model_for_training):
     param_optimizer = list(model_for_training.named_parameters())
