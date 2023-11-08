@@ -19,7 +19,6 @@ args = parser.parse_args()
 input_model = torch.load(args.input_model_path)
 
 if not os.path.exists(args.output_model_path):
-    print('创建路径',args.output_model_path)
     os.mkdir(args.output_model_path)
 
 seg_feed_size=args.feedforward_size // args.tensor_model_parallel_size
