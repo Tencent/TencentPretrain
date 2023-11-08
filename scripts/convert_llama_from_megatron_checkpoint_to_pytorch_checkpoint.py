@@ -15,7 +15,6 @@ parser.add_argument("--tensor_model_parallel_size", type=int, default=4)
 args = parser.parse_args()
 
 if not os.path.exists(args.output_model_path):
-    print('创建路径',args.output_model_path)
     os.mkdir(args.output_model_path)
 
 output_model=torch.load(os.path.join(args.input_model_path,'mp_rank_00_model_states.pt'),map_location='cpu')["module"]
