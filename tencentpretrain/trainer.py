@@ -335,8 +335,7 @@ class LmTrainer(Trainer):
 
     def forward_propagation(self, batch, model):
         src, tgt, seg = batch
-        loss_info = model(src, tgt, seg)
-        loss = loss_info
+        loss = model(src, tgt, seg)
 
         self.total_loss += loss.item()
         loss = loss / self.accumulation_steps
@@ -646,7 +645,7 @@ class DalleTrainer(MlmTrainer):
     pass
 
 
-class AlpacaTrainer(MlmTrainer):
+class LlmSftTrainer(LmTrainer):
     pass
 
 
@@ -655,7 +654,7 @@ str2trainer = {"bert": BertTrainer, "mlm": MlmTrainer, "lm": LmTrainer,
                "mt": MtTrainer, "t5": T5Trainer, "gsg": GsgTrainer,
                "bart": BartTrainer, "prefixlm": PrefixlmTrainer, "cls_mlm": ClsMlmTrainer,
                "vit": VitTrainer, "vilt": ViltTrainer, "clip": ClipTrainer, "s2t": S2tTrainer,
-               "beit": BeitTrainer, "dalle": DalleTrainer, "alpaca": AlpacaTrainer}
+               "beit": BeitTrainer, "dalle": DalleTrainer, "llm_sft": LlmSftTrainer}
 
 
 def worker(local_rank, gpu_ranks, args):
