@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 from tencentpretrain.utils.rope import precompute_freqs_cis
-from tencentpretrain.layers.transformer import TransformerLayer
+from tencentpretrain.layers.transformer import TransformerLayer, ParallelTransformerLayer
 from tencentpretrain.layers.relative_position_embedding import RelativePositionEmbedding
 from tencentpretrain.layers import *
+from tencentpretrain import mpu
 
 class TransformerEncoder(nn.Module):
     """
@@ -19,6 +20,7 @@ class TransformerEncoder(nn.Module):
         self.relative_position_embedding = args.relative_position_embedding
         self.rotary_position_embedding = args.rotary_position_embedding
         self.has_residual_attention = args.has_residual_attention
+        self.use_mp = args.use_mp
         if "deepspeed_checkpoint_activations" in args:
             self.deepspeed_checkpoint_activations = args.deepspeed_checkpoint_activations
             self.deepspeed_checkpoint_layers_num = args.deepspeed_checkpoint_layers_num
@@ -31,11 +33,19 @@ class TransformerEncoder(nn.Module):
             self.linear = nn.Linear(args.emb_size, args.hidden_size)
 
         if self.parameter_sharing:
-            self.transformer = TransformerLayer(args)
+            if self.use_mp:
+                self.transformer = ParallelTransformerLayer(args)
+            else:
+                self.transformer = TransformerLayer(args)
         else:
-            self.transformer = nn.ModuleList(
-                [TransformerLayer(args) for _ in range(self.layers_num)]
-            )
+            if self.use_mp:
+                self.transformer = nn.ModuleList(
+                    [ParallelTransformerLayer(args) for _ in range(self.layers_num)]
+                )
+            else:
+                self.transformer = nn.ModuleList(
+                    [TransformerLayer(args) for _ in range(self.layers_num)]
+                )
         if self.layernorm_positioning == "pre":
             self.layer_norm = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
 
@@ -122,6 +132,8 @@ class TransformerEncoder(nn.Module):
                     return x_, y_
 
                 return custom_forward
+            if self.use_mp:
+                mpu.reset_checkpointed_activations_memory_buffer()
             l = 0
             while l < self.layers_num:
                 hidden, prev_attn = checkpointing.checkpoint(custom(l, l + self.deepspeed_checkpoint_layers_num),

@@ -1,5 +1,6 @@
 import math
 import torch.nn as nn
+from tencentpretrain import mpu
 
 
 class WordEmbedding(nn.Module):
@@ -8,7 +9,10 @@ class WordEmbedding(nn.Module):
 
     def __init__(self, args, vocab_size):
         super(WordEmbedding, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, args.emb_size)
+        if args.use_mp:
+            self.embedding = mpu.VocabParallelEmbedding(vocab_size, args.emb_size)
+        else:
+            self.embedding = nn.Embedding(vocab_size, args.emb_size)
         self.emb_size = args.emb_size
         self.sinusoidalpos = False
         if "sinusoidalpos" in args.embedding:

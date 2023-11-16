@@ -933,7 +933,7 @@ class DalleDataloader(VisionDataloader):
                   torch.LongTensor(seg)
 
 
-class AlpacaDataloader(Dataloader):
+class LlmSftDataloader(Dataloader):
     def __iter__(self):
         while True:
             while self._empty():

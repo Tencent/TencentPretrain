@@ -4,54 +4,72 @@ import time
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel
-from tencentpretrain.model_loader import _load_state_dict_into_model, load_model
+from tencentpretrain import mpu
+from tencentpretrain.initialize import init_env
+from tencentpretrain.model_loader import _load_state_dict_into_model, load_model, load_mp_model
 from tencentpretrain.model_saver import save_model
 from tencentpretrain.model_builder import build_model
 from tencentpretrain.utils.logging import init_logger
 from tencentpretrain.utils.optimizers import *
 from tencentpretrain.utils import *
 from tencentpretrain.utils.seed import set_seed
+from tencentpretrain.initialize import *
 
 
-def train_and_validate(args):
-    set_seed(args.seed)
-
-    # Load vocabulary.
-    if args.data_processor == "mt":
-        args.tgt_tokenizer = str2tokenizer[args.tgt_tokenizer](args, is_src=False)
-        args.tgt_vocab = args.tgt_tokenizer.vocab
-
-    args.tokenizer = str2tokenizer[args.tokenizer](args)
-    args.vocab = args.tokenizer.vocab
-
-    # Build model.
-    if args.deepspeed and args.enable_zero3:
+def init_model(args):
+    if args.deepspeed:
         import deepspeed
-        with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
+    
+        with deepspeed.zero.Init(data_parallel_group=mpu.get_data_parallel_group() if args.use_mp else None,
+                            remote_device=None,
+                            config_dict_or_path=args.deepspeed_config,
+                            enabled=args.enable_zero3 == 3,
+                            mpu=mpu if args.use_mp else None ):
             model_for_training = build_model(args)
+        if args.use_mp:
+            for param in model_for_training.parameters():
+                mpu.set_defaults_if_not_set_tensor_model_parallel_attributes(param)
+
+            if mpu.get_data_parallel_rank() == 0:
+                print(
+                    " > number of parameters on (tensor, pipeline) "
+                    "model parallel rank ({}, {}): {}".format(
+                        mpu.get_tensor_model_parallel_rank(),
+                        mpu.get_pipeline_model_parallel_rank(),
+                        sum(
+                            [
+                                sum([p.ds_numel if hasattr(p, "ds_id") else p.nelement() for p in
+                                    model_for_training.parameters()])
+                            ]
+                        ),
+                    ),
+                    flush=True,
+                )
+                
     else:
         model_for_training = build_model(args)
-
-    # Load or initialize parameters.
+        # Load or initialize parameters.
     if args.pretrained_model_path is not None and args.resume_from_checkpoint is None:
         # Initialize with pretrained model.
+    
         if args.deepspeed and args.enable_zero3:
             if os.path.isdir(args.pretrained_model_path):
-                index_filename = os.path.join(args.pretrained_model_path, "tencentpretrain_model.bin.index.json")
-                with open(index_filename, "r") as f:
-                    index = json.loads(f.read())
-                shard_filenames = sorted(set(index["weight_map"].values()))
-                shard_filenames = [os.path.join(args.pretrained_model_path, f) for f in shard_filenames]
-                for shard_file in shard_filenames:
-                    model_for_training = _load_state_dict_into_model(model_for_training, shard_file, "")
+                    index_filename = os.path.join(args.pretrained_model_path, "tencentpretrain_model.bin.index.json")
+                    with open(index_filename, "r") as f:
+                        index = json.loads(f.read())
+                    shard_filenames = sorted(set(index["weight_map"].values()))
+                    shard_filenames = [os.path.join(args.pretrained_model_path, f) for f in shard_filenames]
+                    for shard_file in shard_filenames:
+                        model_for_training = _load_state_dict_into_model(model_for_training, shard_file, "")
             else:
-                model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path, "")
-                if args.lora_pretrained_model_path is not None:
-                    model_for_training = _load_state_dict_into_model(model_for_training, args.lora_pretrained_model_path, "")
+                    model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path, "")
+                    if args.lora_pretrained_model_path is not None:
+                        model_for_training = _load_state_dict_into_model(model_for_training, args.lora_pretrained_model_path, "")
+        elif args.deepspeed and args.use_mp:
+            model_for_training = load_mp_model(model_for_training, args.pretrained_model_path)
         else:
             model_for_training = load_model(model_for_training, args.pretrained_model_path,
-                                        args.lora_pretrained_model_path)
-
+                                            args.lora_pretrained_model_path)
     else:
         # Initialize with normal distribution.
         if args.deep_init:
@@ -75,17 +93,67 @@ def train_and_validate(args):
     else:
         model_for_dataloader = None
 
+    return model_for_training, model_for_dataloader
+    
+
+def init_optimizer(args, model_for_training):
+    param_optimizer = list(model_for_training.named_parameters())
+    if args.use_lora:
+        optimizer_grouped_parameters = [
+            {"params": [p for n, p in param_optimizer if 'lora' in n]}
+        ]
+        for n, p in list(model_for_training.named_parameters()):
+            if 'lora' not in n:
+                p.requires_grad = False
+    else:
+        no_decay = ["bias", "gamma", "beta"]
+        optimizer_grouped_parameters = [
+            {"params": [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], "weight_decay": 0.01},
+            {"params": [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], "weight_decay": 0.0}
+        ]
+
+    if args.optimizer in ["adamw"]:
+        if args.deepspeed:
+            import deepspeed
+            custom_optimizer = deepspeed.ops.adam.DeepSpeedCPUAdam(optimizer_grouped_parameters, lr=args.learning_rate, bias_correction=False)
+        else:
+            custom_optimizer = str2optimizer[args.optimizer](optimizer_grouped_parameters, lr=args.learning_rate, correct_bias=False)
+    else:
+        custom_optimizer = str2optimizer[args.optimizer](optimizer_grouped_parameters, lr=args.learning_rate, scale_parameter=False, relative_step=False)
+    if args.scheduler in ["constant"]:
+        custom_scheduler = str2scheduler[args.scheduler](custom_optimizer)
+    elif args.scheduler in ["constant_with_warmup"]:
+        custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps * args.warmup)
+    elif args.scheduler in ["tri_stage"]:
+        custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps * args.warmup, args.total_steps * args.decay, args.total_steps)
+    else:
+        custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps * args.warmup, args.total_steps)
+
+    return custom_optimizer, custom_scheduler, optimizer_grouped_parameters
+
+
+def train_and_validate(args):
+    set_seed(args.seed)
+
+    # Load vocabulary.
+    if args.data_processor == "mt":
+        args.tgt_tokenizer = str2tokenizer[args.tgt_tokenizer](args, is_src=False)
+        args.tgt_vocab = args.tgt_tokenizer.vocab
+
+    args.tokenizer = str2tokenizer[args.tokenizer](args)
+    args.vocab = args.tokenizer.vocab
+
     if args.deepspeed:
-        worker(args.local_rank, None, args, model_for_training, model_for_dataloader)
+        worker(args.local_rank, None, args)
     elif args.dist_train:
         # Multiprocessing distributed mode.
-        mp.spawn(worker, nprocs=args.ranks_num, args=(args.gpu_ranks, args, model_for_training, model_for_dataloader), daemon=False)
+        mp.spawn(worker, nprocs=args.ranks_num, args=(args.gpu_ranks, args), daemon=False)
     elif args.single_gpu:
         # Single GPU mode.
-        worker(args.local_rank, None, args, model_for_training, model_for_dataloader)
+        worker(args.local_rank, None, args)
     else:
         # CPU mode.
-        worker(None, None, args, model_for_training, model_for_dataloader)
+        worker(None, None, args)
 
 
 class Trainer(object):
@@ -104,6 +172,8 @@ class Trainer(object):
         self.dist_train = args.dist_train
         self.batch_size = args.batch_size
         self.world_size = args.world_size
+        self.tensor_model_parallel_size = args.tensor_model_parallel_size
+        self.pipeline_model_parallel_size= args.pipeline_model_parallel_size
         self.logger = args.logger
 
     def forward_propagation(self, batch, model):
@@ -257,8 +327,36 @@ class AlbertTrainer(BertTrainer):
     pass
 
 
-class LmTrainer(MlmTrainer):
-    pass
+class LmTrainer(Trainer):
+    def __init__(self, args):
+        super(LmTrainer, self).__init__(args)
+        self.total_correct = 0.0
+        self.total_denominator = 0.0
+
+    def forward_propagation(self, batch, model):
+        src, tgt, seg = batch
+        loss = model(src, tgt, seg)
+
+        self.total_loss += loss.item()
+        loss = loss / self.accumulation_steps
+        return loss
+
+    def report_and_reset_stats(self):
+        done_tokens = self.batch_size * self.seq_length * self.report_steps
+        if self.dist_train:
+            done_tokens *= self.world_size
+            done_tokens = done_tokens // (self.tensor_model_parallel_size * self.pipeline_model_parallel_size)
+        self.logger.info("| {:8d}/{:8d} steps"
+              "| {:8.2f} tokens/s"
+              "| loss {:7.2f}".format(
+                  self.current_step,
+                  self.total_steps,
+                  done_tokens / (time.time() - self.start_time),
+                  self.total_loss / self.report_steps))
+
+        self.total_loss = 0.0
+        self.total_correct = 0.0
+        self.total_denominator = 0.0
 
 
 class BilmTrainer(Trainer):
@@ -543,11 +641,11 @@ class BeitTrainer(MlmTrainer):
         return loss
 
 
-class DalleTrainer(LmTrainer):
+class DalleTrainer(MlmTrainer):
     pass
 
 
-class AlpacaTrainer(LmTrainer):
+class LlmSftTrainer(LmTrainer):
     pass
 
 
@@ -556,72 +654,40 @@ str2trainer = {"bert": BertTrainer, "mlm": MlmTrainer, "lm": LmTrainer,
                "mt": MtTrainer, "t5": T5Trainer, "gsg": GsgTrainer,
                "bart": BartTrainer, "prefixlm": PrefixlmTrainer, "cls_mlm": ClsMlmTrainer,
                "vit": VitTrainer, "vilt": ViltTrainer, "clip": ClipTrainer, "s2t": S2tTrainer,
-               "beit": BeitTrainer, "dalle": DalleTrainer, "alpaca": AlpacaTrainer}
+               "beit": BeitTrainer, "dalle": DalleTrainer, "llm_sft": LlmSftTrainer}
 
 
-def worker(local_rank, gpu_ranks, args, model_for_training, model_for_dataloader=None):
+def worker(local_rank, gpu_ranks, args):
     """
     Args:
         local_rank: The id of GPU for single GPU mode;
                     The id of process (and GPU) for multiprocessing distributed mode.
-        gpu_ranks: List of ranks of each process.
     """
     set_seed(args.seed)
 
     # Get logger
     args.logger = init_logger(args)
 
-    if args.deepspeed:
-        import deepspeed
-        deepspeed.init_distributed(dist_backend=args.backend)
-        global_rank = dist.get_rank()
-    elif args.dist_train:
-        global_rank = gpu_ranks[local_rank]
-    elif args.single_gpu:
-        global_rank = None
-    else:
-        global_rank = None
+    # Env initialize.
+    args.local_rank = local_rank
+    init_env(args)
+    global_rank = args.global_rank
+
+    # Build model.
+    model_for_training, model_for_dataloader = init_model(args)
 
     # Build optimizer.
-    param_optimizer = list(model_for_training.named_parameters())
-    if args.use_lora:
-        optimizer_grouped_parameters = [
-            {"params": [p for n, p in param_optimizer if 'lora' in n]}
-        ]
-        for n, p in list(model_for_training.named_parameters()):
-            if 'lora' not in n:
-                p.requires_grad = False
-    else:
-        no_decay = ["bias", "gamma", "beta"]
-        optimizer_grouped_parameters = [
-            {"params": [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], "weight_decay": 0.01},
-            {"params": [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], "weight_decay": 0.0}
-        ]
-
-    if args.optimizer in ["adamw"]:
-        if args.deepspeed:
-            custom_optimizer = deepspeed.ops.adam.DeepSpeedCPUAdam(optimizer_grouped_parameters, lr=args.learning_rate, bias_correction=False)
-        else:
-            custom_optimizer = str2optimizer[args.optimizer](optimizer_grouped_parameters, lr=args.learning_rate, correct_bias=False)
-    else:
-        custom_optimizer = str2optimizer[args.optimizer](optimizer_grouped_parameters, lr=args.learning_rate, scale_parameter=False, relative_step=False)
-    if args.scheduler in ["constant"]:
-        custom_scheduler = str2scheduler[args.scheduler](custom_optimizer)
-    elif args.scheduler in ["constant_with_warmup"]:
-        custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps*args.warmup)
-    elif args.scheduler in ["tri_stage"]:
-        custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps*args.warmup, args.total_steps*args.lr_decay, args.total_steps)
-    else:
-        custom_scheduler = str2scheduler[args.scheduler](custom_optimizer, args.total_steps*args.warmup, args.total_steps)
+    custom_optimizer, custom_scheduler, optimizer_grouped_parameters = init_optimizer(args, model_for_training)
 
     if args.deepspeed:
+        import deepspeed
         model_for_training, optimizer, _, scheduler = deepspeed.initialize(
                                                     model=model_for_training,
                                                     model_parameters=optimizer_grouped_parameters,
                                                     args=args,
                                                     optimizer=custom_optimizer,
                                                     lr_scheduler=custom_scheduler,
-                                                    mpu=None,
+                                                    mpu=mpu if args.use_mp else None,
                                                     dist_init_required=False)
         if args.resume_from_checkpoint is not None:
             load_path, _ = model_for_training.load_checkpoint(
@@ -638,11 +704,6 @@ def worker(local_rank, gpu_ranks, args, model_for_training, model_for_dataloader
         scheduler = custom_scheduler
 
         if args.dist_train:
-            # Initialize multiprocessing distributed training environment.
-            dist.init_process_group(backend=args.backend,
-                                    init_method=args.master_ip,
-                                    world_size=args.world_size,
-                                    rank=global_rank)
             model_for_training = DistributedDataParallel(model_for_training, device_ids=[local_rank], find_unused_parameters=True)
             if model_for_dataloader is not None:
                 model_for_dataloader = DistributedDataParallel(model_for_dataloader, device_ids=[local_rank], find_unused_parameters=False)
@@ -653,10 +714,14 @@ def worker(local_rank, gpu_ranks, args, model_for_training, model_for_dataloader
     if args.dist_train:
         if model_for_dataloader is not None:
             model_for_dataloader = model_for_dataloader.module
-        train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, global_rank, args.world_size, local_rank, True, model_for_dataloader)
+        if args.use_mp:
+            train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, global_rank,
+                                                               args.world_size // (args.tensor_model_parallel_size * args.pipeline_model_parallel_size),
+                                                               local_rank, True, model_for_dataloader)
+        else:
+            train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, global_rank, args.world_size, local_rank, True, model_for_dataloader)
     else:
         train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, 0, 1, local_rank, True, model_for_dataloader)
-
 
     trainer = str2trainer[args.data_processor](args)
     trainer.train(args, local_rank, global_rank, train_loader, model_for_training, optimizer, scheduler)
