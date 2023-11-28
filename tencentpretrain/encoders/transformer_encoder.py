@@ -21,6 +21,13 @@ class TransformerEncoder(nn.Module):
         self.rotary_position_embedding = args.rotary_position_embedding
         self.has_residual_attention = args.has_residual_attention
         self.use_mp = args.use_mp
+
+        if self.relative_position_embedding:
+            args.relative_pos_emb = RelativePositionEmbedding(bidirectional=True, heads_num=args.heads_num,
+                                                              num_buckets=args.relative_attention_buckets_num)
+        elif self.rotary_position_embedding:
+            args.freqs_cis = precompute_freqs_cis(args.hidden_size // args.heads_num, args.max_seq_length * 2)
+
         if "deepspeed_checkpoint_activations" in args:
             self.deepspeed_checkpoint_activations = args.deepspeed_checkpoint_activations
             self.deepspeed_checkpoint_layers_num = args.deepspeed_checkpoint_layers_num
@@ -101,54 +108,35 @@ class TransformerEncoder(nn.Module):
             mask = (1.0 - mask) * -10000.0
 
         hidden = emb
-
-        if self.relative_position_embedding:
-            position_bias = self.relative_pos_emb(hidden, hidden)
-        else:
-            position_bias = None
-
-        if self.rotary_position_embedding:
-            freqs_cis = self.freqs_cis[:seq_length].to(hidden.device)
-        else:
-            freqs_cis = None
-
-        prev_attn = None
+        inputs = hidden, mask
 
         if self.deepspeed_checkpoint_activations:
             from deepspeed import checkpointing
 
             def custom(start, end):
                 def custom_forward(*inputs):
-                    x_, y_, position_bias_, freqs_cis_ = inputs
                     for index in range(start, end):
                         if self.parameter_sharing:
-                            x_, y_ = self.transformer(x_, mask, position_bias=position_bias_,
-                                                             has_residual_attention=self.has_residual_attention,
-                                                             prev_attn=y_, freqs_cis=freqs_cis_)
+                            inputs = self.transformer(*inputs)
                         else:
-                            x_, y_ = self.transformer[index](x_, mask, position_bias=position_bias_,
-                                                             has_residual_attention=self.has_residual_attention,
-                                                             prev_attn=y_, freqs_cis=freqs_cis_)
-                    return x_, y_
+                            inputs = self.transformer[index](*inputs)
+                    return inputs
 
                 return custom_forward
             if self.use_mp:
                 mpu.reset_checkpointed_activations_memory_buffer()
             l = 0
             while l < self.layers_num:
-                hidden, prev_attn = checkpointing.checkpoint(custom(l, l + self.deepspeed_checkpoint_layers_num),
-                                                             hidden, prev_attn, position_bias, freqs_cis)
+                inputs = checkpointing.checkpoint(custom(l, l + self.deepspeed_checkpoint_layers_num), inputs)
                 l += self.deepspeed_checkpoint_layers_num
         else:
             for i in range(self.layers_num):
                 if self.parameter_sharing:
-                    hidden, prev_attn = self.transformer(hidden, mask, position_bias=position_bias,
-                                                         has_residual_attention=self.has_residual_attention,
-                                                         prev_attn=prev_attn, freqs_cis=freqs_cis)
+                    inputs = self.transformer(inputs)
                 else:
-                    hidden, prev_attn = self.transformer[i](hidden, mask, position_bias=position_bias,
-                                                            has_residual_attention=self.has_residual_attention,
-                                                            prev_attn=prev_attn, freqs_cis=freqs_cis)
+                    inputs = self.transformer[i](inputs)
+
+        hidden = inputs[0]
 
         if self.layernorm_positioning == "pre":
             return self.layer_norm(hidden)

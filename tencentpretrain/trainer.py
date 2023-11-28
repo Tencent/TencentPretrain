@@ -23,7 +23,7 @@ def init_model(args):
         with deepspeed.zero.Init(data_parallel_group=mpu.get_data_parallel_group() if args.use_mp else None,
                             remote_device=None,
                             config_dict_or_path=args.deepspeed_config,
-                            enabled=args.enable_zero3 == 3,
+                            enabled=args.enable_zero3 == True,
                             mpu=mpu if args.use_mp else None ):
             model_for_training = build_model(args)
         if args.use_mp:
