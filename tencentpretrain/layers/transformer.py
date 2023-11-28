@@ -11,6 +11,13 @@ class TransformerLayer(nn.Module):
         super(TransformerLayer, self).__init__()
 
         self.layernorm_positioning = args.layernorm_positioning
+        self.relative_position_embedding = args.relative_position_embedding
+        self.rotary_position_embedding = args.rotary_position_embedding
+        self.has_residual_attention = args.has_residual_attention
+        if self.relative_position_embedding:
+            self.relative_pos_emb = args.relative_pos_emb
+        if self.rotary_position_embedding:
+            self.freqs_cis = args.freqs_cis
 
         if hasattr(args, "attention_head_size"):
             attention_head_size = args.attention_head_size
@@ -45,8 +52,8 @@ class TransformerLayer(nn.Module):
         self.layer_norm_1 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
         self.layer_norm_2 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
 
-    def forward(self, hidden, mask, position_bias=None, has_residual_attention=False,
-                prev_attn=None, freqs_cis=None, alibi=None):
+    def forward(self, inputs):
+
         """
         Args:
             hidden: [batch_size x seq_length x emb_size]
@@ -55,23 +62,44 @@ class TransformerLayer(nn.Module):
         Returns:
             output: [batch_size x seq_length x hidden_size]
         """
+        if len(inputs)==2:
+            hidden, mask = inputs
+            prev_attn = None
+        else:
+            hidden, mask, prev_attn = inputs
+
+        _, seq_length, _ = hidden.size()
+
+        if self.relative_position_embedding:
+            position_bias = self.relative_pos_emb(hidden, hidden)
+        else:
+            position_bias = None
+
+        if self.rotary_position_embedding:
+            freqs_cis = self.freqs_cis[:seq_length].to(hidden.device)
+        else:
+            freqs_cis = None
 
         if self.layernorm_positioning == "post":
-            inter, prev_attn_out = self.self_attn(hidden, hidden, hidden, mask, position_bias, has_residual_attention,
-                                                  prev_attn, freqs_cis, alibi)
+            inter, prev_attn_out = self.self_attn(hidden, hidden, hidden, mask, position_bias, self.has_residual_attention,
+                                                  prev_attn, freqs_cis)
             inter = self.dropout_1(inter)
             inter = self.layer_norm_1(inter + hidden)
             output = self.dropout_2(self.feed_forward(inter))
             output = self.layer_norm_2(output + inter)
         else:
             inter = self.layer_norm_1(hidden)
-            inter, prev_attn_out = self.self_attn(inter, inter, inter, mask, position_bias, has_residual_attention,
-                                                  prev_attn, freqs_cis, alibi)
+            inter, prev_attn_out = self.self_attn(inter, inter, inter, mask, position_bias, self.has_residual_attention,
+                                                  prev_attn, freqs_cis)
             inter = self.dropout_1(inter)
             hidden = hidden + inter
             output = self.layer_norm_2(hidden)
             output = self.dropout_2(self.feed_forward(output)) + hidden
-        return output, prev_attn_out
+
+        if self.has_residual_attention:
+            return output, mask, prev_attn_out
+        else:
+            return output, mask
 
 
 class ParallelTransformerLayer(nn.Module):
@@ -80,6 +108,13 @@ class ParallelTransformerLayer(nn.Module):
         super(ParallelTransformerLayer, self).__init__()
 
         self.layernorm_positioning = args.layernorm_positioning
+        self.relative_position_embedding = args.relative_position_embedding
+        self.rotary_position_embedding = args.rotary_position_embedding
+        self.has_residual_attention = args.has_residual_attention
+        if self.relative_position_embedding:
+            self.relative_pos_emb = args.relative_pos_emb
+        if self.rotary_position_embedding:
+            self.freqs_cis = args.freqs_cis
 
         if hasattr(args, "attention_head_size"):
             attention_head_size = args.attention_head_size
@@ -114,8 +149,7 @@ class ParallelTransformerLayer(nn.Module):
         self.layer_norm_1 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
         self.layer_norm_2 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
 
-    def forward(self, hidden, mask, position_bias=None, has_residual_attention=False,
-                prev_attn=None, freqs_cis=None, alibi=None):
+    def forward(self, inputs):
 
         """
         Args:
@@ -126,22 +160,44 @@ class ParallelTransformerLayer(nn.Module):
             output: [batch_size x seq_length x hidden_size]
         """
 
+        if len(inputs)==2:
+            hidden, mask = inputs
+            prev_attn = None
+        else:
+            hidden, mask, prev_attn = inputs
+
+        _, seq_length, _ = hidden.size()
+
+        if self.relative_position_embedding:
+            position_bias = self.relative_pos_emb(hidden, hidden)
+        else:
+            position_bias = None
+
+        if self.rotary_position_embedding:
+            freqs_cis = self.freqs_cis[:seq_length].to(hidden.device)
+        else:
+            freqs_cis = None
+
         if self.layernorm_positioning == "post":
-            inter, prev_attn_out = self.self_attn(hidden, hidden, hidden, mask, position_bias, has_residual_attention,
-                                                  prev_attn, freqs_cis, alibi)
+            inter, prev_attn_out = self.self_attn(hidden, hidden, hidden, mask, position_bias, self.has_residual_attention,
+                                                  prev_attn, freqs_cis)
             inter = self.dropout_1(inter)
             inter = self.layer_norm_1(inter + hidden)
             output = self.dropout_2(self.feed_forward(inter))
             output = self.layer_norm_2(output + inter)
         else:
             inter = self.layer_norm_1(hidden)
-            inter, prev_attn_out = self.self_attn(inter, inter, inter, mask, position_bias, has_residual_attention,
-                                                  prev_attn, freqs_cis, alibi)
+            inter, prev_attn_out = self.self_attn(inter, inter, inter, mask, position_bias, self.has_residual_attention,
+                                                  prev_attn, freqs_cis)
             inter = self.dropout_1(inter)
             hidden = hidden + inter
             output = self.layer_norm_2(hidden)
             output = self.dropout_2(self.feed_forward(output)) + hidden
-        return output, prev_attn_out
+
+        if self.has_residual_attention:
+            return output, mask, prev_attn_out
+        else:
+            return output, mask
 
 
 class TransformerDecoderLayer(nn.Module):
