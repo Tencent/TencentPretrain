@@ -1010,7 +1010,7 @@ class AlpacaDataset(Dataset):
                 input = data.get("input", "").replace('\\n', '\n')
                 output = data.get("output", "").replace('\\n', '\n')
 
-                document_input = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(instruction + input))
+                document_input = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(instruction + " ### Instruction:" + input + " ### Response:"))
                 document_output = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(output))
 
                 src = [self.vocab.get(CLS_TOKEN)] + document_input
