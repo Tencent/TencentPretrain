@@ -200,6 +200,51 @@ class ParallelTransformerLayer(nn.Module):
             return output, mask
 
 
+class ParallelTransformerLayerPipe(nn.Module):
+
+    def __init__(self, args, model, layer_idx):
+        super(ParallelTransformerLayerPipe, self).__init__()
+        self.layer_idx=layer_idx
+        self.layernorm_positioning = args.layernorm_positioning
+        self.has_residual_attention = args.has_residual_attention
+        if self.layernorm_positioning == "pre":
+           self.layer_norm = model.encoder.layer_norm 
+        self.layer = model.encoder.transformer[layer_idx]
+
+    def generate_mask(self, seq_length, batch_size):
+        mask = torch.ones(seq_length, seq_length, device=device)
+        mask = torch.tril(mask)
+        mask = (1.0 - mask) * -10000
+        mask = mask.repeat(batch_size, 1, 1, 1)
+
+    def forward(self, inputs):
+
+        """
+        Args:
+            hidden: [batch_size x seq_length x emb_size]
+            mask: [batch_size x 1 x seq_length x seq_length]
+            position_bias: [1 x heads_num x seq_length x seq_length]
+        Returns:
+            output: [batch_size x seq_length x hidden_size]
+        """
+
+        if len(inputs)==3:
+            hidden, tgt, seg = inputs
+            prev_attn = None
+        else:
+            hidden, tgt, seg, prev_attn = inputs
+        mask = self.generate_mask(seq_length, batch_size, hidden.device)
+        layer_inputs = hidden, mask, prev_attn
+        outputs = self.layer(layer_inputs)
+
+        if self.has_residual_attention:
+            hidden, mask, prev_attn_out = outputs
+            return hidden, tgt, seg ,prev_attn
+        else:
+            hidden, mask = outputs
+            return hidden, tgt, seg
+
+
 class TransformerDecoderLayer(nn.Module):
     def __init__(self, args):
         super(TransformerDecoderLayer, self).__init__()

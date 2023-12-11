@@ -28,6 +28,7 @@ class Dataloader(object):
         self.span_masking = args.span_masking
         self.span_geo_prob = args.span_geo_prob
         self.span_max_length = args.span_max_length
+        self.use_pipe = args.use_pipe
 
     def _fill_buf(self):
         try:
@@ -183,10 +184,15 @@ class LmDataloader(Dataloader):
                 src.append(src_single[:-1])
                 tgt.append(src_single[1:])
                 seg.append([1] * ins[1][0] + [0] * (len(src_single) - 1 - ins[1][0]))
-
-            yield torch.LongTensor(src), \
-                torch.LongTensor(tgt), \
-                torch.LongTensor(seg)
+            
+            if self.use_pipe:
+                yield (torch.LongTensor(src), \
+                    torch.LongTensor(tgt),torch.LongTensor(seg)), \
+                    torch.LongTensor(seg)
+            else:
+                yield torch.LongTensor(src), \
+                    torch.LongTensor(tgt), \
+                    torch.LongTensor(seg)
 
 
 class BilmDataloader(Dataloader):

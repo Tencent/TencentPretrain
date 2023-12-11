@@ -32,3 +32,15 @@ class Embedding(nn.Module):
             emb = self.layer_norm(emb)
         emb = self.dropout(emb)
         return emb
+
+
+class EmbeddingPipe(torch.nn.Module):
+    def __init__(self, args,model):
+        super(EmbeddingPipe, self).__init__()
+        self.embeddings = model.embedding
+   
+    def forward(self, inputs):
+        src, tgt, seg=inputs
+        emb=self.word_embeddings(src, seg)
+
+        return hidden, tgt, seg

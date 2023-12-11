@@ -21,3 +21,14 @@ class Target(nn.Module):
                 self.loss_info = target(memory_bank, tgt, seg)
 
         return self.loss_info
+
+
+class PipeTarget(nn.Module):
+    def __init__(self,args,model):
+        super(PipeTarget, self).__init__()
+        self.target_layer=model.target
+    def forward(self,inputs):
+        hidden, tgt, seg=inputs
+        loss_info=self.target_layer(hidden, tgt ,seg)
+        
+        return loss_info

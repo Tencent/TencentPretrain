@@ -14,6 +14,9 @@ from tencentpretrain.utils.optimizers import *
 from tencentpretrain.utils import *
 from tencentpretrain.utils.seed import set_seed
 from tencentpretrain.initialize import *
+from tencentpretrain.embeddings.embedding import EmbeddingPipe
+from tencentpretrain.layers.transformer import ParallelTransformerLayerPipe
+from tencentpretrain.targets.target import PipeTarget
 
 
 def init_model(args):
@@ -184,29 +187,38 @@ class Trainer(object):
 
         raise NotImplementedError
 
+    def train_pipe(self, loader_iter, model):
+
+        raise NotImplementedError
+
     def train(self, args, local_rank, global_rank, loader, model, optimizer, scheduler):
         model.train()
         loader_iter = iter(loader)
         while True:
             if self.current_step == self.total_steps + 1:
                 break
-            batch = list(next(loader_iter))
-            self.seq_length = batch[0].size(1)
-            if local_rank is not None:
-                for i in range(len(batch)):
-                    if torch.is_tensor(batch[i]):
-                        batch[i] = batch[i].cuda(local_rank)
+            if args.use_pipe:
+                loss = self.train_pipe(model, loader_iter)
+            else:
+                batch = list(next(loader_iter))
+                self.seq_length = batch[0].size(1)
+                if local_rank is not None:
+                    for i in range(len(batch)):
+                        if torch.is_tensor(batch[i]):
+                            batch[i] = batch[i].cuda(local_rank)
 
-            loss = self.forward_propagation(batch, model)
+                loss = self.forward_propagation(batch, model)
 
             if args.deepspeed:
-                model.backward(loss)
+                if not args.use_pipe:
+                    model.backward(loss)
             else:
                 loss.backward()
 
             if self.current_step % self.accumulation_steps == 0:
                 if args.deepspeed:
-                    model.step()
+                    if not args.use_pipe:
+                        model.step()
                 else:
                     optimizer.step()
                     scheduler.step()
@@ -338,6 +350,14 @@ class LmTrainer(Trainer):
         loss = model(src, tgt, seg)
 
         self.total_loss += loss.item()
+        loss = loss / self.accumulation_steps
+        return loss
+
+    def train_pipe(self, loader_iter, model):      
+        loss = model.train_batch(data_iter=loader_iter)
+
+        self.total_loss += loss.item()
+ 
         loss = loss / self.accumulation_steps
         return loss
 
@@ -675,6 +695,25 @@ def worker(local_rank, gpu_ranks, args):
 
     # Build model.
     model_for_training, model_for_dataloader = init_model(args)
+
+    if args.use_pipe:
+        from deepspeed.pipe import PipelineModule, TiedLayerSpec, LayerSpec
+        def get_model(model, args):
+            layers = [LayerSpec(EmbeddingPipe, args,model=model),
+                    *[LayerSpec(ParallelTransformerLayerPipe, args,model=model, layer_idx=idx) for idx in
+                        range(args.layers_num)],
+                    LayerSpec(PipeTarget, args=args,model=model)
+                    ]
+            return layers
+        layers = get_model(model_for_training,args)
+        from deepspeed.runtime.pipe.topology import PipeModelDataParallelTopology
+        topo = PipeModelDataParallelTopology(num_pp=mpu.get_pipeline_model_parallel_world_size(),
+                                            num_mp=mpu.get_tensor_model_parallel_world_size(),
+                                            num_dp=mpu.get_data_parallel_world_size())
+
+        model_for_training=PipelineModule(layers=layers, 
+                                            num_stages=args.pipeline_model_parallel_size, activation_checkpoint_interval=args.deepspeed_checkpoint_layers_num,
+                                            checkpointable_layers=['ParallelTransformerLayerPipe'], topology=topo)
 
     # Build optimizer.
     custom_optimizer, custom_scheduler, optimizer_grouped_parameters = init_optimizer(args, model_for_training)
