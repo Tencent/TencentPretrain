@@ -233,6 +233,7 @@ class ParallelTransformerLayerPipe(nn.Module):
             prev_attn = None
         else:
             hidden, tgt, seg, prev_attn = inputs
+        batch_size, seq_length, _ = hidden.size()
         mask = self.generate_mask(seq_length, batch_size, hidden.device)
         layer_inputs = hidden, mask, prev_attn
         outputs = self.layer(layer_inputs)
