@@ -41,6 +41,6 @@ class EmbeddingPipe(torch.nn.Module):
    
     def forward(self, inputs):
         src, tgt, seg=inputs
-        emb=self.word_embeddings(src, seg)
+        emb=self.embeddings(src, seg)
 
-        return hidden, tgt, seg
+        return emb, tgt, seg

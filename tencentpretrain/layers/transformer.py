@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from tencentpretrain.layers.multi_headed_attn import MultiHeadedAttention, ParallelMultiHeadedAttention
 from tencentpretrain.layers import *
@@ -211,11 +212,12 @@ class ParallelTransformerLayerPipe(nn.Module):
            self.layer_norm = model.encoder.layer_norm 
         self.layer = model.encoder.transformer[layer_idx]
 
-    def generate_mask(self, seq_length, batch_size):
+    def generate_mask(self, seq_length, batch_size, device):
         mask = torch.ones(seq_length, seq_length, device=device)
         mask = torch.tril(mask)
         mask = (1.0 - mask) * -10000
         mask = mask.repeat(batch_size, 1, 1, 1)
+        return mask
 
     def forward(self, inputs):
 

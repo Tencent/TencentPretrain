@@ -198,7 +198,7 @@ class Trainer(object):
             if self.current_step == self.total_steps + 1:
                 break
             if args.use_pipe:
-                loss = self.train_pipe(model, loader_iter)
+                loss = self.train_pipe(loader_iter, model)
             else:
                 batch = list(next(loader_iter))
                 self.seq_length = batch[0].size(1)
@@ -355,7 +355,6 @@ class LmTrainer(Trainer):
 
     def train_pipe(self, loader_iter, model):      
         loss = model.train_batch(data_iter=loader_iter)
-
         self.total_loss += loss.item()
  
         loss = loss / self.accumulation_steps
@@ -726,7 +725,7 @@ def worker(local_rank, gpu_ranks, args):
                                                     args=args,
                                                     optimizer=custom_optimizer,
                                                     lr_scheduler=custom_scheduler,
-                                                    mpu=mpu if args.use_mp else None,
+                                                    mpu=mpu if args.use_mp and not args.use_pipe else None,
                                                     dist_init_required=False)
         if args.resume_from_checkpoint is not None:
             load_path, _ = model_for_training.load_checkpoint(
