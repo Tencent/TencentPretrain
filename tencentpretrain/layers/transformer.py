@@ -230,11 +230,11 @@ class ParallelTransformerLayerPipe(nn.Module):
             output: [batch_size x seq_length x hidden_size]
         """
 
-        if len(inputs)==3:
-            hidden, tgt, seg = inputs
+        if len(inputs)==2:
+            hidden, seg = inputs
             prev_attn = None
         else:
-            hidden, tgt, seg, prev_attn = inputs
+            hidden, seg, prev_attn = inputs
         batch_size, seq_length, _ = hidden.size()
         mask = self.generate_mask(seq_length, batch_size, hidden.device)
         layer_inputs = hidden, mask, prev_attn
@@ -242,10 +242,10 @@ class ParallelTransformerLayerPipe(nn.Module):
 
         if self.has_residual_attention:
             hidden, mask, prev_attn_out = outputs
-            return hidden, tgt, seg ,prev_attn
+            return hidden, seg ,prev_attn
         else:
             hidden, mask = outputs
-            return hidden, tgt, seg
+            return hidden, seg
 
 
 class TransformerDecoderLayer(nn.Module):

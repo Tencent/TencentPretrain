@@ -40,7 +40,7 @@ class EmbeddingPipe(torch.nn.Module):
         self.embeddings = model.embedding
    
     def forward(self, inputs):
-        src, tgt, seg=inputs
+        src, seg=inputs
         emb=self.embeddings(src, seg)
 
-        return emb, tgt, seg
+        return emb, seg

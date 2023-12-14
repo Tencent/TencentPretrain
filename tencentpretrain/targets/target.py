@@ -23,12 +23,23 @@ class Target(nn.Module):
         return self.loss_info
 
 
-class PipeTarget(nn.Module):
+class TargetPipe(nn.Module):
     def __init__(self,args,model):
         super(PipeTarget, self).__init__()
         self.target_layer=model.target
     def forward(self,inputs):
-        hidden, tgt, seg=inputs
-        loss_info=self.target_layer(hidden, tgt ,seg)
+        hidden, seg=inputs
+        loss_info=self.target_layer(hidden, None, seg)
         
         return loss_info
+
+
+def CrossEntropy(output, labels):
+    tgt_lm, seg = labels[0], labels[1]
+    seg = seg.contiguous().view(-1)
+    tgt_lm = tgt_lm.contiguous().view(-1)
+    tgt_lm = tgt_lm[seg > 0]
+    losses = mpu.vocab_parallel_cross_entropy(output, tgt_lm)
+    loss = torch.sum(losses.view(-1)) / len(losses)
+
+    return loss

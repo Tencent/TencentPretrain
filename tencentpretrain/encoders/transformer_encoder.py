@@ -20,7 +20,7 @@ class TransformerEncoder(nn.Module):
         self.relative_position_embedding = args.relative_position_embedding
         self.rotary_position_embedding = args.rotary_position_embedding
         self.has_residual_attention = args.has_residual_attention
-        self.use_mp = args.use_mp
+        self.tensor_model_parallel_size = args.tensor_model_parallel_size
 
         if self.relative_position_embedding:
             args.relative_pos_emb = RelativePositionEmbedding(bidirectional=True, heads_num=args.heads_num,
@@ -40,12 +40,12 @@ class TransformerEncoder(nn.Module):
             self.linear = nn.Linear(args.emb_size, args.hidden_size)
 
         if self.parameter_sharing:
-            if self.use_mp:
+            if self.tensor_model_parallel_size > 1:
                 self.transformer = ParallelTransformerLayer(args)
             else:
                 self.transformer = TransformerLayer(args)
         else:
-            if self.use_mp:
+            if self.tensor_model_parallel_size > 1:
                 self.transformer = nn.ModuleList(
                     [ParallelTransformerLayer(args) for _ in range(self.layers_num)]
                 )
@@ -123,7 +123,7 @@ class TransformerEncoder(nn.Module):
                     return inputs
 
                 return custom_forward
-            if self.use_mp:
+            if self.tensor_model_parallel_size > 1:
                 mpu.reset_checkpointed_activations_memory_buffer()
             l = 0
             while l < self.layers_num:

@@ -41,7 +41,7 @@ def init_env(args):
     if args.deepspeed:
         import deepspeed
         deepspeed.init_distributed(dist_backend=args.backend)
-        if args.use_mp:
+        if args.tensor_model_parallel_size > 1:
             set_global_variables(args)
             args = get_args()
             finish_mpu_init()
