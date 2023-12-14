@@ -13,6 +13,8 @@ def main():
                         help="Path of the preprocessed dataset.")
     parser.add_argument("--pretrained_model_path", type=str, default=None,
                         help="Path of the pretrained model.")
+    parser.add_argument("--vit_model_path", type=str, default=None,
+                        help="Path of the Vit pretrained model.")
     parser.add_argument("--output_model_path", type=str, required=True,
                         help="Path of the output model.")
     parser.add_argument("--config_path", type=str, default="models/bert/base_config.json",

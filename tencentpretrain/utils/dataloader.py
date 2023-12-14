@@ -963,3 +963,66 @@ class LlmSftDataloader(Dataloader):
             yield torch.LongTensor(src), \
                   torch.LongTensor(tgt), \
                   torch.LongTensor(seg)
+
+
+class LlavaDataloader(VisionDataloader):
+
+    def __iter__(self):
+        """
+        instances: ((src, tgt), (seg_src, seg_tgt), (src_image, image_pos))
+            src, tgt: Tokens of the text sample
+            seg_src, seg_tgt: Segment of text sample
+            src_image: Path of the image sample
+            image_pos: Position of the image in the text sample
+
+        Returns:
+            src_text: [batch_size x seq_length]
+            src_image: [batch_size x channel_size x width x hight]
+            tgt: [batch_size x seq_length]
+            seg_text: [batch_size x seq_length]
+            seg_image: [batch_size x (patch_num + 1)]
+            seg_tgt: [batch_size x seq_length]
+            image_pos: [batch_size]
+
+        """
+        from torchvision.io import read_image
+        from torchvision.io.image import ImageReadMode
+        while True:
+            while self._empty():
+                self._fill_buf()
+            if self.start + self.batch_size >= self.end:
+                instances = self.buffer[self.start:]
+            else:
+                instances = self.buffer[self.start: self.start + self.batch_size]
+
+            self.start += self.batch_size
+
+            src_text = []
+            src_image = []
+            tgt = []
+            seg_text = []
+            seg_image = []
+            seg_tgt = []
+            image_pos = []
+            for ins in instances:
+                ins_src, ins_tgt = ins[0]
+                ins_seg_src, ins_seg_tgt = ins[1]
+                ins_src_image, ins_image_pos = ins[2]
+
+                src_text.append(ins_src)
+                tgt.append(ins_tgt)
+                seg_text.append(ins_seg_src)
+                seg_tgt.append(ins_seg_tgt)
+                image = read_image(ins_src_image, ImageReadMode.RGB)
+                image = image.cuda(self.local_rank)
+                src_image.append(self.transform(image))
+                seg_image.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
+                image_pos.append(ins_image_pos)
+
+            yield  torch.LongTensor(src_text), \
+                   torch.stack(src_image, 0).half(), \
+                   torch.LongTensor(tgt), \
+                   torch.LongTensor(seg_text), \
+                   torch.LongTensor(seg_image), \
+                   torch.LongTensor(seg_tgt), \
+                   image_pos

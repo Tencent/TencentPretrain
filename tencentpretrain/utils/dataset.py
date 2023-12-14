@@ -969,6 +969,118 @@ class FileWithTextDataset(Dataset):
         dataset_writer.close()
 
 
+class FileWithTextJsonlDataset(Dataset):
+    def worker(self, proc_id, start, end):
+        import json
+        num_image_tokens = 577 #int(args.image_width / args.patch_size) * int(args.image_height / args.patch_size) + 1 # 336/14-14 --> 576 dim
+        seq_text = self.seq_length - num_image_tokens # 576
+        PAD_ID = self.tokenizer.convert_tokens_to_ids([PAD_TOKEN])[0]
+        prompt_template = {
+        "llama2": "<<SYS>>\nYou are a helpful language and vision assistant. You are able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.\n<</SYS>>\n\n",
+        "vicuna": "<<SYS>>\nA chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions.\n<</SYS>>\n\n"
+        }
+        # self.prompt_template 待添加
+        # try:
+        #     if self.prompt_template == "llama2":
+        #         prompt_overall = prompt_template["llama2"]
+        #     elif self.prompt_template == "vicuna":
+        #         prompt_overall = prompt_template["vicuna"]
+        # except:
+        #     print("unsupported prompt template!")
+        #     NotImplementedError
+        prompt_overall = prompt_template["llama2"]
+        print("Worker %d is building dataset ... " % proc_id)
+        set_seed(self.seed)
+        dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
+        pos = 0
+        skip_line = 0
+        with open(self.corpus_path, mode="r", encoding="utf-8") as f:
+            while pos < start:
+                f.readline()
+                pos += 1
+            while True:
+                line = json.loads(f.readline())
+                pos += 1
+                try:
+                    path = line["image"]
+                    if not os.path.isfile(path):
+                        continue
+                except:
+                    skip_line += 1
+                    continue
+                conversations = line["conversations"]
+
+                prompt_before_image = prompt_overall + " USER:"
+                for i, conv in enumerate(conversations):
+                    if i == 0:
+                        prompt = conv["value"]
+                        if prompt.endswith("<image>"):
+                            prompt_before_image = prompt_before_image + prompt.replace("<image>","<Image>")
+                            prompt_after_image = "</sImage>\nASSISTANT:"
+                        elif prompt.startswith("<image>"):
+                            prompt_before_image = prompt_before_image + "<Image>"
+                            prompt_after_image = prompt.replace("<image>","</Image>") + "\nASSISTANT:"
+                        prompt_before_image_id = self.tokenizer.convert_tokens_to_ids(
+                            self.tokenizer.tokenize(prompt_before_image)
+                        )
+                        prompt_after_image_id = self.tokenizer.convert_tokens_to_ids(
+                            self.tokenizer.tokenize(prompt_after_image)
+                        )
+                        seg_before_image = [1] * len(prompt_before_image_id)
+                        seg_after_image = [1] * len(prompt_after_image_id)
+                        if len(prompt_before_image_id) + len(prompt_after_image_id) > seq_text:
+                            print("promt too long, jump for now")
+                            continue
+                        text_combine_id =  prompt_before_image_id + prompt_after_image_id
+                        text_combine_seg = seg_before_image + seg_after_image
+                        tgt_id = [PAD_ID] * (len(text_combine_id) + num_image_tokens - 1)
+                        tgt_seg = [0] * len(tgt_id)
+                    elif i % 2 == 0: # human
+                        prompt = conv["value"]
+                        prompt_id = self.tokenizer.convert_tokens_to_ids(
+                            self.tokenizer.tokenize(" USER:" + prompt + "\nASSISTANT:")
+                        )
+                        text_combine_id = text_combine_id + prompt_id
+                        text_combine_seg = text_combine_seg + [1] * len(prompt_id)
+                        tgt_id = tgt_id + [PAD_ID] * len(prompt_id)
+                        tgt_seg = tgt_seg + [0] * len(prompt_id)
+                    else: # gpt
+                        answer = conv["value"]
+                        answer_id = self.tokenizer.convert_tokens_to_ids(
+                            self.tokenizer.tokenize(answer) + [SEP_TOKEN]
+                        )
+                        text_combine_id = text_combine_id + answer_id
+                        text_combine_seg = text_combine_seg + [1] * len(answer_id)
+                        tgt_id = tgt_id + answer_id
+                        tgt_seg = tgt_seg + [1] * len(answer_id)
+
+                if len(tgt_id) > self.seq_length:
+                    tgt_id = tgt_id[:self.seq_length]
+                    tgt_seg = tgt_seg[:self.seq_length]
+                pad_num = self.seq_length - len(tgt_id)
+                tgt_id = tgt_id + [PAD_ID] * pad_num
+                tgt_seg = tgt_seg + [0] * pad_num
+
+                if len(text_combine_id) > seq_text :
+                    text_combine_id = text_combine_id[:seq_text]
+                    text_combine_seg = text_combine_seg[:seq_text]
+                pad_num = seq_text - len(text_combine_id)
+                text_combine_id = text_combine_id + [PAD_ID] * pad_num
+                text_combine_seg = text_combine_seg + [0] * pad_num
+
+                image_pos = len(prompt_before_image_id)
+                src = (text_combine_id, tgt_id)
+                seg = (text_combine_seg, tgt_seg)
+                image = (path, image_pos)
+
+                pickle.dump((src, seg, image), dataset_writer)
+
+                if pos >= end:
+                    break
+
+        dataset_writer.close()
+
+
 class FileWithLabelDataset(Dataset):
     def worker(self, proc_id, start, end):
         print("Worker %d is building dataset ... " % proc_id)
@@ -1083,3 +1195,7 @@ class LlmSftDataset(Dataset):
                     break
 
         dataset_writer.close()
+
+
+class LlavaDataset(FileWithTextJsonlDataset):
+    pass

@@ -8,13 +8,14 @@ from tencentpretrain.embeddings.patch_embedding import PatchEmbedding
 from tencentpretrain.embeddings.word_patch_embedding import WordPatchEmbedding
 from tencentpretrain.embeddings.speech_embedding import SpeechEmbedding
 from tencentpretrain.embeddings.masked_patch_embedding import MaskedPatchEmbedding
+from tencentpretrain.embeddings.image_text_embedding import ImageTextEmbedding
 
 
 str2embedding = {"word": WordEmbedding, "pos": PosEmbedding, "seg": SegEmbedding,
                  "sinusoidalpos": SinusoidalposEmbedding, "dual": DualEmbedding,
                  "patch": PatchEmbedding, "word_patch": WordPatchEmbedding, "speech": SpeechEmbedding,
-                 "masked_patch": MaskedPatchEmbedding}
+                 "masked_patch": MaskedPatchEmbedding, "image_text": ImageTextEmbedding}
 
 __all__ = ["Embedding", "WordEmbedding", "PosEmbedding", "SegEmbedding", "SinusoidalposEmbedding",
            "DualEmbedding", "PatchEmbedding", "WordPatchEmbedding", "SpeechEmbedding",
-           "MaskedPatchEmbedding", "str2embedding"]
+           "MaskedPatchEmbedding", "str2embedding", "ImageTextEmbedding"]

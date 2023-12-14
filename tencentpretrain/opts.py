@@ -52,7 +52,9 @@ def model_opts(parser):
                         help="whether use alibi position embedding.")
     parser.add_argument("--layer_number_scale", action="store_true",
                         help="whether use layer number scaling.")
-
+    # add for llava
+    parser.add_argument("--freeze_encoder", action="store_true",
+                        help="whether freeze the encoder parameters.")
     vision_opts(parser)
     audio_opts(parser)
 
