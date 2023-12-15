@@ -1,4 +1,7 @@
+import torch
 import torch.nn as nn
+
+from tencentpretrain import mpu
 
 
 class Target(nn.Module):
@@ -25,7 +28,7 @@ class Target(nn.Module):
 
 class TargetPipe(nn.Module):
     def __init__(self,args,model):
-        super(PipeTarget, self).__init__()
+        super(TargetPipe, self).__init__()
         self.target_layer=model.target
     def forward(self,inputs):
         hidden, seg=inputs

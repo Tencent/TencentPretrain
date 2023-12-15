@@ -205,7 +205,8 @@ class ParallelTransformerLayerPipe(nn.Module):
 
     def __init__(self, args, model, layer_idx):
         super(ParallelTransformerLayerPipe, self).__init__()
-        self.layer_idx=layer_idx
+        self.layer_idx = layer_idx
+        self.layer_num = args.layers_num
         self.layernorm_positioning = args.layernorm_positioning
         self.has_residual_attention = args.has_residual_attention
         if self.layernorm_positioning == "pre":
@@ -242,11 +243,16 @@ class ParallelTransformerLayerPipe(nn.Module):
 
         if self.has_residual_attention:
             hidden, mask, prev_attn_out = outputs
-            return hidden, seg ,prev_attn
         else:
             hidden, mask = outputs
-            return hidden, seg
 
+        if self.layer_idx == self.layer_num-1 and self.layernorm_positioning == "pre":
+            hidden = self.layer_norm(hidden)
+
+        if self.has_residual_attention:
+            return hidden, seg, prev_attn
+        else:
+            return hidden, seg
 
 class TransformerDecoderLayer(nn.Module):
     def __init__(self, args):

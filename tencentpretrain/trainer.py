@@ -194,6 +194,9 @@ class Trainer(object):
     def train(self, args, local_rank, global_rank, loader, model, optimizer, scheduler):
         model.train()
         loader_iter = iter(loader)
+        if args.pipeline_model_parallel_size > 1:
+            self.seq_length = list(next(loader_iter))[0][0].size(1)
+            loader.start = 0
         while True:
             if self.current_step == self.total_steps + 1:
                 break
@@ -752,12 +755,9 @@ def worker(local_rank, gpu_ranks, args):
     if args.dist_train:
         if model_for_dataloader is not None:
             model_for_dataloader = model_for_dataloader.module
-        if args.tensor_model_parallel_size > 1:
-            train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, global_rank,
-                                                               args.world_size // (args.tensor_model_parallel_size * args.pipeline_model_parallel_size),
-                                                               local_rank, True, model_for_dataloader)
-        else:
-            train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, global_rank, args.world_size, local_rank, True, model_for_dataloader)
+        train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, global_rank,
+                                                           args.world_size // (args.tensor_model_parallel_size * args.pipeline_model_parallel_size),
+                                                           local_rank, True, model_for_dataloader)
     else:
         train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, 0, 1, local_rank, True, model_for_dataloader)
 
