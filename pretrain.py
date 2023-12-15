@@ -37,6 +37,7 @@ def main():
                         help="The buffer size of instances in memory.")
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout value.")
     parser.add_argument("--seed", type=int, default=7, help="Random seed.")
+    parser.add_argument("--train_embedding_only", action="store_true")
 
     # Preprocess options.
     tokenizer_opts(parser)

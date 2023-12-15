@@ -584,6 +584,16 @@ def worker(local_rank, gpu_ranks, args, model_for_training, model_for_dataloader
 
     # Build optimizer.
     param_optimizer = list(model_for_training.named_parameters())
+    if args.train_embedding_only:
+        optimizer_grouped_parameters = [
+            {"params": [p for n, p in param_optimizer if 'embedding' in n or "output_layer" in n]},
+            #{"params": [p for n, p in param_optimizer if 'embedding' not in n and "output_layer" not in n], "lr": 0}
+        ]
+        #print(optimizer_grouped_parameters)
+        for n, p in list(model_for_training.named_parameters()):
+            if 'embedding' not in n and "output_layer" not in n:
+                p.requires_grad = False
+
     if args.use_lora:
         optimizer_grouped_parameters = [
             {"params": [p for n, p in param_optimizer if 'lora' in n]}

@@ -28,7 +28,7 @@ index_dict = {"weight_map": {}}
 state_dict = collections.OrderedDict()
 filename = f"tencentpretrain_model-0.bin"
 for k, v in input_model.items():
-    state_dict[k] = v
+    state_dict[k] = v.bfloat16()
     index_dict["weight_map"][k] = filename
     param_count += v.numel()
     file_count += v.numel()
