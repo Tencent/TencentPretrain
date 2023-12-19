@@ -52,9 +52,10 @@ def model_opts(parser):
                         help="whether use alibi position embedding.")
     parser.add_argument("--layer_number_scale", action="store_true",
                         help="whether use layer number scaling.")
-    # add for llava
-    parser.add_argument("--freeze_encoder", action="store_true",
-                        help="whether freeze the encoder parameters.")
+    parser.add_argument("--freeze_parameters", choices=["embedding", "encoder", "tgt_embedding", "decoder", "target"],
+                        default="", nargs='+', help="Which module to be frozen during training.")
+    parser.add_argument("--freeze_exclude_by_name", type=str, default="",
+                        help="Exclude some modules with the specific string in the name when freezing parameters.")
     vision_opts(parser)
     audio_opts(parser)
 

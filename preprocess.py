@@ -41,6 +41,13 @@ def main():
                              "The larger value, the higher probability of using short (truncated) sequence.")
     parser.add_argument("--full_sentences", action="store_true", help="Full sentences.")
     parser.add_argument("--seed", type=int, default=7, help="Random seed.")
+    parser.add_argument("--instruction_template", choices=["sys1", "sys2"], default="sys1",
+                        help="The instruction type for training large language-vision model.")
+    
+    # Image options.
+    parser.add_argument("--image_width", type=int, default=336, help="The width of the input images.")
+    parser.add_argument("--image_height", type=int, default=336, help="The height of the input images.")
+    parser.add_argument("--patch_size", type=int, default=14, help="The patch size for the input images.")
 
     # Masking options.
     parser.add_argument("--dynamic_masking", action="store_true", help="Dynamic masking.")

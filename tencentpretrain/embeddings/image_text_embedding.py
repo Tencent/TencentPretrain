@@ -18,7 +18,7 @@ class ImageTextEmbedding(nn.Module):
     '''
     def __init__(self, args, vocab_size):
         super(ImageTextEmbedding, self).__init__()
-        # Vit model for vision features
+        # vision model for vision features
         vision_encoder_args = copy.deepcopy(vars(args))
         vision_encoder_args.update(args.image_text_emb["vision_encoder"])
         vision_encoder_args = Namespace(**vision_encoder_args)
@@ -28,7 +28,7 @@ class ImageTextEmbedding(nn.Module):
             self.vision_embedding.update(tmp_emb, embedding_name)
         self.vision_encoder = str2encoder[vision_encoder_args.encoder](vision_encoder_args)
 
-        # map the output of ViT into the same space as the text features
+        # map the output of vision model into the same space as the text features
         projection_args = copy.deepcopy(vars(args))
         projection_args.update(args.image_text_emb["projection"])
         projection_args = Namespace(**projection_args)
@@ -49,21 +49,20 @@ class ImageTextEmbedding(nn.Module):
 
     def forward(self, src, seg=None):
         src_text, src_image, seg_text, seg_image, image_pos = src
-        # seg_text, seg_image, image_pos = seg
         # image features
         with torch.no_grad():
-            emb = self.vision_embedding(src_image, seg_image)
-            image_emb = self.vision_encoder(emb, seg_image)
+            image_emb = self.vision_embedding(src_image, seg_image)
+            image_emb = self.vision_encoder(image_emb, seg_image)
         image_emb = self.projection(image_emb)
         # text embedding
         text_emb = self.text_embedding(src_text, seg_text)
         # combine text and image
         if text_emb.shape[0] == 1:
-            emb_combine = torch.cat((text_emb[:,:image_pos[0],:], image_emb, text_emb[:,image_pos[0]:,:]), 1)
+            emb = torch.cat((text_emb[:,:image_pos[0],:], image_emb, text_emb[:,image_pos[0]:,:]), 1)
         else:
-            emb_combine = torch.cat((text_emb[0,:image_pos[0],:], image_emb[0], text_emb[0,image_pos[0]:,:]), 0).unsqueeze(0)
+            emb = torch.cat((text_emb[0,:image_pos[0],:], image_emb[0], text_emb[0,image_pos[0]:,:]), 0).unsqueeze(0)
             for i in range(1, text_emb.shape[0]):
                 tmp = torch.cat((text_emb[i,:image_pos[i],:], image_emb[i], text_emb[i,image_pos[i]:,:]), 0).unsqueeze(0)
-                emb_combine = torch.cat((emb_combine, tmp), 0)
-        # seg_combine = torch.cat((seg_image, seg_text), 1)
-        return emb_combine
+                emb = torch.cat((emb, tmp), 0)
+
+        return emb

@@ -971,7 +971,7 @@ class LlavaDataloader(VisionDataloader):
         """
         instances: ((src, tgt), (seg_src, seg_tgt), (src_image, image_pos))
             src, tgt: Tokens of the text sample
-            seg_src, seg_tgt: Segment of text sample
+            seg_src_nums, seg_tgt_nums: Number of the segment information of text sample
             src_image: Path of the image sample
             image_pos: Position of the image in the text sample
 
@@ -987,6 +987,7 @@ class LlavaDataloader(VisionDataloader):
         """
         from torchvision.io import read_image
         from torchvision.io.image import ImageReadMode
+        seg_num = (self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1
         while True:
             while self._empty():
                 self._fill_buf()
@@ -1006,17 +1007,21 @@ class LlavaDataloader(VisionDataloader):
             image_pos = []
             for ins in instances:
                 ins_src, ins_tgt = ins[0]
-                ins_seg_src, ins_seg_tgt = ins[1]
+                ins_seg_nums_src, ins_seg_nums_tgt = ins[1]
                 ins_src_image, ins_image_pos = ins[2]
 
                 src_text.append(ins_src)
                 tgt.append(ins_tgt)
+                ins_seg_src = [1] * ins_seg_nums_src[0] + [0] * ins_seg_nums_src[1]
+                ins_seg_tgt = []
+                for i, num in enumerate(ins_seg_nums_tgt):
+                    ins_seg_tgt = ins_seg_tgt + [i % 2] * num
                 seg_text.append(ins_seg_src)
                 seg_tgt.append(ins_seg_tgt)
                 image = read_image(ins_src_image, ImageReadMode.RGB)
                 image = image.cuda(self.local_rank)
                 src_image.append(self.transform(image))
-                seg_image.append([1] * ((self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1))
+                seg_image.append([1] * seg_num)
                 image_pos.append(ins_image_pos)
 
             yield  torch.LongTensor(src_text), \

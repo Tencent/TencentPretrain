@@ -28,15 +28,18 @@ class Model(nn.Module):
             
         if self.decoder is not None and args.share_embedding:
             self.tgt_embedding.word.embedding.weight = self.embedding.word.embedding.weight
-        # add for llava
-        if "freeze_encoder" in args and args.freeze_encoder:
-            for name, param in self.encoder.named_parameters():
-                param.requires_grad = False
-            for name, param in self.embedding.named_parameters():
-                if "image_text.projection" not in name:
-                    param.requires_grad = False
-            for name, param in self.target.named_parameters():
-                param.requires_grad = False
+
+        if args.freeze_parameters:
+            name_mapping = {
+                "embedding": self.embedding, "encoder": self.encoder, "tgt_embedding": self.tgt_embedding,
+                "decoder": self.decoder, "target": self.target
+                }
+            for freeze_name in args.freeze_parameters:
+                if name_mapping[freeze_name] is None:
+                    continue
+                for name, param in name_mapping[freeze_name].named_parameters():
+                    if args.freeze_exclude_by_name == "" or args.freeze_exclude_by_name not in name:
+                        param.requires_grad = False
 
     def forward(self, src, tgt, seg, tgt_in=None, tgt_seg=None):
         emb = self.embedding(src, seg)

@@ -18,4 +18,4 @@ str2embedding = {"word": WordEmbedding, "pos": PosEmbedding, "seg": SegEmbedding
 
 __all__ = ["Embedding", "WordEmbedding", "PosEmbedding", "SegEmbedding", "SinusoidalposEmbedding",
            "DualEmbedding", "PatchEmbedding", "WordPatchEmbedding", "SpeechEmbedding",
-           "MaskedPatchEmbedding", "str2embedding", "ImageTextEmbedding"]
+           "MaskedPatchEmbedding", "ImageTextEmbedding", "str2embedding"]

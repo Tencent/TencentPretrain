@@ -63,9 +63,7 @@ def init_model(args):
                     for shard_file in shard_filenames:
                         model_for_training = _load_state_dict_into_model(model_for_training, shard_file, "")
             else:
-                    args.logger.info("loading: {}".format(args.pretrained_model_path))
                     model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path, "")
-                    args.logger.info("loaded: {}".format(args.pretrained_model_path))
                     if args.lora_pretrained_model_path is not None:
                         model_for_training = _load_state_dict_into_model(model_for_training, args.lora_pretrained_model_path, "")
         elif args.deepspeed and args.use_mp:
@@ -95,12 +93,12 @@ def init_model(args):
         model_for_dataloader = build_vqgan_model(args)
     else:
         model_for_dataloader = None
-    # add for llava
-    if args.vit_model_path is not None:
-        args.logger.info("loading: {}".format(args.vit_model_path))
-        # model_for_training = _load_state_dict_into_model(model_for_training, args.vit_model_path, "embedding.image_text.vision_")
-        keys_info = model_for_training.load_state_dict(torch.load(args.vit_model_path, map_location="cpu"), strict=False)
-        args.logger.info("loaded: {}".format(args.vit_model_path))
+
+    if args.vision_model_path is not None:
+        args.logger.info("loading: {}".format(args.vision_model_path))
+        # model_for_training = _load_state_dict_into_model(model_for_training, args.vision_model_path, "embedding.image_text.vision_")
+        keys_info = model_for_training.load_state_dict(torch.load(args.vision_model_path, map_location="cpu"), strict=False)
+        args.logger.info("loaded: {}".format(args.vision_model_path))
         args.logger.info("missing_keys: {0}".format(keys_info.missing_keys))
         args.logger.info("unexpected_keys: {0}".format(keys_info.unexpected_keys))
     return model_for_training, model_for_dataloader
@@ -697,14 +695,8 @@ def worker(local_rank, gpu_ranks, args):
     # Build model.
     model_for_training, model_for_dataloader = init_model(args)
 
-    # add for llava
     if global_rank == 0:
         args.logger.info("model: {}".format(model_for_training))
-        # for name, param in model_for_training.named_parameters():
-        #     args.logger.info("name: {}, requires_grad:  {}".format(name, param.requires_grad))
-    # import pdb
-    # pdb.set_trace()
-    # add for llava end
 
     # Build optimizer.
     custom_optimizer, custom_scheduler, optimizer_grouped_parameters = init_optimizer(args, model_for_training)
