@@ -970,7 +970,7 @@ class FileWithTextDataset(Dataset):
         dataset_writer.close()
 
 
-class FileWithTextJsonlDataset(Dataset):
+class FileWithTextJsonDataset(Dataset):
     def worker(self, proc_id, start, end):
         import json
         num_image_tokens = int(self.args.image_width / self.args.patch_size) * int(self.args.image_height / self.args.patch_size) + 1 
@@ -992,23 +992,21 @@ class FileWithTextJsonlDataset(Dataset):
         print("Worker %d is building dataset ... " % proc_id)
         set_seed(self.seed)
         dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
-        pos = 0
-        skip_line = 0
+        pos = start
+        skip_item = 0
         with open(self.corpus_path, mode="r", encoding="utf-8") as f:
-            while pos < start:
-                f.readline()
-                pos += 1
+            datas = json.load(f)
             while True:
-                line = json.loads(f.readline())
+                item = datas[pos]
                 pos += 1
                 try:
-                    path = line["image"]
+                    path = item["image"]
                     if not os.path.isfile(path):
                         continue
                 except:
-                    skip_line += 1
+                    skip_item += 1
                     continue
-                conversations = line["conversations"]
+                conversations = item["conversations"]
 
                 prompt_before_image = instruction_overall + " USER:"
                 text_combine_seg_nums, tgt_seg_nums = [], []
@@ -1191,5 +1189,5 @@ class LlmSftDataset(Dataset):
         dataset_writer.close()
 
 
-class LlavaDataset(FileWithTextJsonlDataset):
+class LlavaDataset(FileWithTextJsonDataset):
     pass

@@ -4,6 +4,11 @@ import sys
 
 def count_lines(file_path):
     lines_num = 0
+    if file_path.endswith(".json"):
+        import json
+        with open(file_path, 'rb') as f:
+            data = json.load(f)
+            return len(data)
     with open(file_path, 'rb') as f:
         while True:
             data = f.read(2 ** 20)
