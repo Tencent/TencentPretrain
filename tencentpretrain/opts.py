@@ -228,12 +228,8 @@ def deepspeed_opts(parser):
 
 
 def mp_opts(parser):
-    parser.add_argument("--use_mp", action="store_true",
-                        help=".")
     parser.add_argument("--tensor_model_parallel_size", type=int, default=1,
                         help="Degree of tensor model parallelism.")
-    parser.add_argument("--use_pipe", action="store_true",
-                        help=".")
     parser.add_argument("--pipeline_model_parallel_size", type=int, default=1,
                         help="Degree of pipeline model parallelism.")
     parser.add_argument("--virtual_pipeline_model_parallel_size", type=int, default=None,
