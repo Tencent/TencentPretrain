@@ -96,11 +96,8 @@ def init_model(args):
 
     if args.vision_model_path is not None:
         args.logger.info("loading: {}".format(args.vision_model_path))
-        # model_for_training = _load_state_dict_into_model(model_for_training, args.vision_model_path, "embedding.image_text.vision_")
-        keys_info = model_for_training.load_state_dict(torch.load(args.vision_model_path, map_location="cpu"), strict=False)
-        args.logger.info("loaded: {}".format(args.vision_model_path))
-        args.logger.info("missing_keys: {0}".format(keys_info.missing_keys))
-        args.logger.info("unexpected_keys: {0}".format(keys_info.unexpected_keys))
+        model_for_training = _load_state_dict_into_model(model_for_training, args.vision_model_path, missing_prefix=args.vision_model_missing_prefix)
+        # model_for_training = load_model(model_for_training, args.vision_model_path)
     return model_for_training, model_for_dataloader
     
 
