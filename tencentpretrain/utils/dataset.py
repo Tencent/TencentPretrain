@@ -229,6 +229,7 @@ class MlmDataset(Dataset):
     def __init__(self, args, vocab, tokenizer):
         super(MlmDataset, self).__init__(args, vocab, tokenizer)
         self.full_sentences = args.full_sentences
+        self.json_format_corpus = args.json_format_corpus
 
     def worker(self, proc_id, start, end):
         print("Worker %d is building dataset ... " % proc_id)
@@ -243,7 +244,13 @@ class MlmDataset(Dataset):
                     pos += 1
                 while True:
                     line = f.readline()
+                    if self.json_format_corpus:
+                        data = json.loads(line)
+                        line = data.get("text", "") + data.get("content", "")
+
                     pos += 1
+                    if len(line) < 5:
+                        continue
 
                     document = [self.vocab.get(CLS_TOKEN)] + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line)) + [self.vocab.get(SEP_TOKEN)]
 
