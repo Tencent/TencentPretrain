@@ -247,10 +247,12 @@ class MlmDataset(Dataset):
                     if self.json_format_corpus:
                         data = json.loads(line)
                         line = data.get("text", "") + data.get("content", "")
+                        if len(line) < 5:
+                            continue
+                        if pos >= end:
+                            break
 
                     pos += 1
-                    if len(line) < 5:
-                        continue
 
                     document = [self.vocab.get(CLS_TOKEN)] + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line)) + [self.vocab.get(SEP_TOKEN)]
 
@@ -281,8 +283,7 @@ class MlmDataset(Dataset):
                             for instance in instances:
                                 pickle.dump(instance, dataset_writer)
 
-                    if pos >= end:
-                        break
+
 
         dataset_writer.close()
 
