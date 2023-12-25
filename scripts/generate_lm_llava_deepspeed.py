@@ -27,7 +27,7 @@ from tencentpretrain.utils.config import load_hyperparam
 from tencentpretrain.opts import infer_opts, tokenizer_opts, log_opts, mp_opts
 from tencentpretrain.opts import deepspeed_opts
 from tencentpretrain.utils.logging import init_logger
-from tencentpretrain.model_loader import _load_state_dict_into_model
+from tencentpretrain.model_loader import _load_state_dict_into_model, load_model
 from tencentpretrain.utils.misc import pooling, ZeroOneNormalize
 
 
@@ -96,12 +96,9 @@ def load_or_initialize_parameters(args, model):
         keys_info = model.load_state_dict(torch.load(args.pretrained_model_path, map_location="cpu"), strict=False)
         args.logger.info("missing_keys: {0}".format(keys_info.missing_keys))
         args.logger.info("unexpected_keys: {0}".format(keys_info.unexpected_keys))
-        if args.vit_model_path is not None:
-            args.logger.info("loading model from {0}".format(args.vit_model_path))   
-            # model = _load_state_dict_into_model(model, args.vit_model_path, "embedding.image_text.vision_")
-            keys_info = model.load_state_dict(torch.load(args.vit_model_path, map_location="cpu"), strict=False)
-            args.logger.info("missing_keys: {0}".format(keys_info.missing_keys))
-            args.logger.info("unexpected_keys: {0}".format(keys_info.unexpected_keys))
+        if args.vision_model_path is not None:
+            args.logger.info("loading model from {0}".format(args.vision_model_path))   
+            model = load_model(model, args.vision_model_path, missing_prefix="embedding.image_text.vision_")
     else:
         # Initialize with normal distribution.
         for n, p in list(model.named_parameters()):
@@ -117,12 +114,10 @@ if __name__ == '__main__':
     parser.add_argument("--top_k", type=int, default=70)
     parser.add_argument("--top_p", type=float, default=0)
     parser.add_argument("--temperature", type=float, default=1.0)
-    parser.add_argument("--vit_model_path", type=str, default=None,
-                    help="Pretrained model of Vit.")
-    parser.add_argument("--connector_model_path", type=str, default=None,
-                    help="Pretrained model of Connector.")
-    parser.add_argument("--prompt_template", type=str, choices=["llama2", "vicuna"],
-                        help="give the llm type to choose a prompt", default="llama2")
+    parser.add_argument("--vision_model_path", type=str, default=None,
+                    help="Pretrained vision model.")
+    parser.add_argument("--instruction_template", type=str, choices=["sys1", "sys2"],
+                        help="The instruction type for training large language-vision model.", default="sys3")
 
     tokenizer_opts(parser)
 
@@ -147,15 +142,15 @@ if __name__ == '__main__':
 
     # Load or initialize parameters.
     if args.enable_zero3:
+        print("enable_zero3:", args.enable_zero3)
         with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
             model = LLaVaGenerate(args)
             if args.pretrained_model_path:
                 model = _load_state_dict_into_model(model, args.pretrained_model_path)
-            if args.vit_model_path is not None:
-                model = _load_state_dict_into_model(model, args.vit_model_path, "embedding.image_text.vision_")
+            if args.vision_model_path is not None:
+                model = _load_state_dict_into_model(model, args.vision_model_path, missing_prefix="embedding.image_text.vision_")
     else:
         model = LLaVaGenerate(args)
-        # Load or initialize parameters.
         load_or_initialize_parameters(args, model)
 
     deepspeed.init_distributed()
@@ -170,18 +165,17 @@ if __name__ == '__main__':
         ZeroOneNormalize()
     ])
     prompt_template = {
-        "llama2": "<<SYS>>\nYou are a helpful language and vision assistant. You are able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.\n<</SYS>>\n\n",
-        "vicuna": "<<SYS>>\nA chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions.\n<</SYS>>\n\n"}
-    num_image_tokens = int(args.image_width / args.patch_size) * int(args.image_height / args.patch_size) + 1 # 336/14-14 --> 576 dim
-    seq_text = args.seq_length - num_image_tokens # 576
+        "sys1": "<<SYS>>\nYou are a helpful language and vision assistant. You are able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.\n<</SYS>>\n\n",
+        "sys2": "<<SYS>>\nA chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions.\n<</SYS>>\n\n",
+        "sys3": "<SYS> You are a helpful language and vision assistant. </SYS> \n"
+    }
+    num_image_tokens = int(args.image_width / args.patch_size) * int(args.image_height / args.patch_size) + 1 # 336/14-14 --> 576 + 1 dim
+    seq_text = args.seq_length - num_image_tokens
     outf = open(args.prediction_path, mode="w", encoding="utf-8")
     input_f = open(args.test_path, mode="r", encoding="utf-8")
     datas = json.load(input_f)
     try:
-        if args.prompt_template == "llama2":
-            prompt_overall = prompt_template["llama2"]
-        elif args.prompt_template == "vicuna":
-            prompt_overall = prompt_template["vicuna"]
+        prompt_overall = prompt_template[args.instruction_template]
     except:
         args.logger.info("unsupported prompt template!")
         NotImplementedError
@@ -283,12 +277,10 @@ if __name__ == '__main__':
 
                 text_tensor = torch.cat([text_tensor, next_token.view(1, 1)], dim=1)
                 text_seg_tensor = torch.cat([text_seg_tensor, torch.tensor([[1]]).to(device)], dim=1)
-                # print("next_token:", next_token)
                 if next_token.cpu().tolist() == SEP_ID:
                     break
 
         if rank == 0 and text_tensor is not None:
-            # outf.write("\t".join(line)+"\n")
             tokens = [token_id.item() for token_id in text_tensor[0]]
             if args.tokenizer.sp_model is not None:
                 generated_sentence = args.tokenizer.sp_model.decode(tokens)

@@ -4,16 +4,23 @@ import collections
 from tencentpretrain import mpu
 
 
-def load_model(model, model_path, lora_pretrained_model_path=None):
+def load_model(model, model_path, lora_pretrained_model_path=None, missing_prefix=""):
     """
     Load model from saved weights.
     """
+    state_dict = torch.load(model_path, map_location="cpu")
+    if missing_prefix != "":
+        state_dict_withprefix = collections.OrderedDict()
+        for k in state_dict.keys():
+            state_dict_withprefix[missing_prefix + k] = state_dict[k]
+        del state_dict
+        state_dict = state_dict_withprefix
     if hasattr(model, "module"):
-        model.module.load_state_dict(torch.load(model_path, map_location="cpu"), strict=False)
+        model.module.load_state_dict(state_dict, strict=False)
         if lora_pretrained_model_path is not None:
             model.module.load_state_dict(torch.load(lora_pretrained_model_path, map_location="cpu"), strict=False)
     else:
-        model.load_state_dict(torch.load(model_path, map_location="cpu"), strict=False)
+        model.load_state_dict(state_dict, strict=False)
         if lora_pretrained_model_path is not None:
             model.load_state_dict(torch.load(lora_pretrained_model_path, map_location="cpu"), strict=False)
     return model
