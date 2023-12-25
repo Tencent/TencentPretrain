@@ -3,5 +3,5 @@
   "unk_token": "<unk>",
   "cls_token": "<s>",
   "sep_token": "</s>",
-  "mask_token": "<mask>"
+  "mask_token": "<unk>"
 }
