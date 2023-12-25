@@ -3,7 +3,10 @@ from tencentpretrain.utils.constants import *
 
 
 def mask_seq(src, tokenizer, whole_word_masking, span_masking, span_geo_prob, span_max_length):
+
     vocab = tokenizer.vocab
+    print("vocab.get(CLS_TOKEN): ", vocab.get(CLS_TOKEN))
+    print("vocab.get(MASK_TOKEN): ", vocab.get(MASK_TOKEN))
     PAD_ID = vocab.get(PAD_TOKEN)
     for i in range(len(src) - 1, -1, -1):
         if src[i] != PAD_ID:
