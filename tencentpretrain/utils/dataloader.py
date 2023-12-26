@@ -1018,12 +1018,17 @@ class LlavaDataloader(VisionDataloader):
                     ins_seg_tgt = ins_seg_tgt + [i % 2] * num
                 seg_text.append(ins_seg_src)
                 seg_tgt.append(ins_seg_tgt)
-                image = read_image(ins_src_image, ImageReadMode.RGB)
+                try:
+                    image = read_image(ins_src_image, ImageReadMode.RGB)
+                except:
+                    print("Something is wrong when reading {}, just skipped!".format(ins_src_image))
+                    continue
                 image = image.cuda(self.local_rank)
                 src_image.append(self.transform(image))
                 seg_image.append([1] * seg_num)
                 image_pos.append(ins_image_pos)
-
+            if len(src_image) == 0:
+                continue 
             yield  torch.LongTensor(src_text), \
                    torch.stack(src_image, 0).half(), \
                    torch.LongTensor(tgt), \
