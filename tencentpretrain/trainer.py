@@ -57,17 +57,17 @@ def init_model(args):
     
         if args.deepspeed and args.enable_zero3:
             if os.path.isdir(args.pretrained_model_path):
-                    index_filename = os.path.join(args.pretrained_model_path, "tencentpretrain_model.bin.index.json")
-                    with open(index_filename, "r") as f:
-                        index = json.loads(f.read())
-                    shard_filenames = sorted(set(index["weight_map"].values()))
-                    shard_filenames = [os.path.join(args.pretrained_model_path, f) for f in shard_filenames]
-                    for shard_file in shard_filenames:
-                        model_for_training = _load_state_dict_into_model(model_for_training, shard_file, "")
+                index_filename = os.path.join(args.pretrained_model_path, "tencentpretrain_model.bin.index.json")
+                with open(index_filename, "r") as f:
+                    index = json.loads(f.read())
+                shard_filenames = sorted(set(index["weight_map"].values()))
+                shard_filenames = [os.path.join(args.pretrained_model_path, f) for f in shard_filenames]
+                for shard_file in shard_filenames:
+                    model_for_training = _load_state_dict_into_model(model_for_training, shard_file, "")
             else:
-                    model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path, "")
-                    if args.lora_pretrained_model_path is not None:
-                        model_for_training = _load_state_dict_into_model(model_for_training, args.lora_pretrained_model_path, "")
+                model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path, "")
+                if args.lora_pretrained_model_path is not None:
+                    model_for_training = _load_state_dict_into_model(model_for_training, args.lora_pretrained_model_path, "")
         elif args.deepspeed and args.tensor_model_parallel_size > 1:
             model_for_training = load_mp_model(model_for_training, args.pretrained_model_path)
         else:

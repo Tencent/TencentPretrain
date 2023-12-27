@@ -44,8 +44,6 @@ class Dataloader(object):
             # Reach file end.
             self.dataset_reader.seek(0)
 
-        if self.shuffle:
-            random.shuffle(self.buffer)
         self.start = 0
         self.end = len(self.buffer)
 
