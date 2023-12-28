@@ -1,5 +1,6 @@
 import os
 import torch
+import json
 from tencentpretrain import mpu
 
 
@@ -74,4 +75,36 @@ def load_mp_model(model, model_path):
     else:
         model.load_state_dict(torch.load(weight_list[tp_rank], map_location="cpu"), strict=True)
     
+    return model
+
+def load_state_dict_block_model(model, model_path):
+    if os.path.isdir(model_path):
+        index_filename = os.path.join(model_path, "tencentpretrain_model.bin.index.json")
+        with open(index_filename, "r") as f:
+            index = json.loads(f.read())
+        shard_filenames = sorted(set(index["weight_map"].values()))
+        shard_filenames = [os.path.join(model_path, f) for f in shard_filenames]
+        for shard_file in shard_filenames:
+            model = _load_state_dict_into_model(model, shard_file, "")
+    elif model_path is not None:
+        model = _load_state_dict_into_model(model, model_path, "")
+    return model
+
+def load_block_model(model, model_path):
+    if os.path.isdir(model_path):
+        index_filename = os.path.join(model_path, "tencentpretrain_model.bin.index.json")
+        with open(index_filename, "r") as f:
+            index = json.loads(f.read())
+        shard_filenames = sorted(set(index["weight_map"].values()))
+        shard_filenames = [os.path.join(model_path, f) for f in shard_filenames]
+        for shard_file in shard_filenames:
+            model.load_state_dict(torch.load(shard_file, map_location="cpu"), strict=False)
+    elif model_path is not None:
+        # Initialize with pretrained model.
+        model.load_state_dict(torch.load(model_path, map_location="cpu"), strict=False)
+    else:
+        # Initialize with normal distribution.
+        for n, p in list(model.named_parameters()):
+            if "gamma" not in n and "beta" not in n:
+                p.data.normal_(0, 0.02)
     return model

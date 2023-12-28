@@ -15,10 +15,12 @@ sys.path.append(tencentpretrain_dir)
 
 from tencentpretrain.opts import *
 from tencentpretrain.utils.config import load_hyperparam
-from tencentpretrain.model_loader import _load_state_dict_into_model, load_model
+from tencentpretrain.utils.logging import *
+from tencentpretrain.utils import *
+from tencentpretrain.model_loader import load_block_model, load_state_dict_block_model
 from finetune.run_classifier_mt_deepspeed import read_dataset
 from inference.run_classifier_mt_infer import MultitaskClassifier
-from tencentpretrain.utils import *
+
 
 def batch_loader(batch_size, src, seg, is_pad):
     instances_num = src.size()[0]
@@ -79,27 +81,21 @@ def main():
     # Build tokenizer.
     args.tokenizer = str2tokenizer[args.tokenizer](args)
 
-    args.use_mp = False
+    # Get logger.
+    args.logger = init_logger(args)
 
     # Build multi-task classification model and load parameters.
     args.soft_targets, args.soft_alpha = False, False
     deepspeed.init_distributed()
+    # Build multi-task classification model.
     if args.enable_zero3:
         with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
             model = MultitaskClassifier(args)
-            if os.path.isdir(args.load_model_path):
-                index_filename = os.path.join(args.load_model_path, "tencentpretrain_model.bin.index.json")
-                with open(index_filename, "r") as f:
-                    index = json.loads(f.read())
-                shard_filenames = sorted(set(index["weight_map"].values()))
-                shard_filenames = [os.path.join(args.load_model_path, f) for f in shard_filenames]
-                for shard_file in shard_filenames:
-                    model = _load_state_dict_into_model(model, shard_file, "")
-            elif args.load_model_path:
-                    model = _load_state_dict_into_model(model, args.load_model_path, "")
+            model = load_state_dict_block_model(model, args.load_model_path)
     else:
         model = MultitaskClassifier(args)
-        model = load_model(model, args.load_model_path)
+        # Load or initialize parameters.
+        model = load_block_model(model, args.load_model_path)
     model = deepspeed.initialize(model=model,config_params=args.deepspeed_config)[0]
     args.model = model
 
@@ -108,38 +104,36 @@ def main():
     dataset = predict(args, read_dataset(args, args.test_path)[args.rank])
     output = torch.as_tensor(dataset).to(args.device)
     output_list = [torch.zeros_like(output).to(args.device) for _ in range(args.world_size)]
-    dist.all_gather(output_list, output, async_op=False)
+    dist.all_gather(output_list, output)
 
-    with open(args.prediction_path, mode="w", encoding="utf-8") as f:
-        if args.rank == 0:
+    if args.rank == 0:
+        with open(args.prediction_path, mode="w", encoding="utf-8") as f:
             f.write("label")
             if args.output_logits:
                 f.write("\t" + "logits")
             if args.output_prob:
                 f.write("\t" + "prob")
             f.write("\n")
-        for logits_all in output_list:
-            logits = logits_all[:,:,:-1]
-            is_pad = logits_all[0,:,-1]
+            for logits_all in output_list:
+                logits = logits_all[:,:,:-1]
+                is_pad = logits_all[0,:,-1]
 
-            pred = [torch.argmax(logits_i, dim=-1) for logits_i in logits]
-            prob = [nn.Softmax(dim=-1)(logits_i) for logits_i in logits]
-            logits = [x.cpu().numpy().tolist() for x in logits]
-            pred   = [x.cpu().numpy().tolist() for x in pred]
-            prob   = [x.cpu().numpy().tolist() for x in prob]
-            pad    = [x.cpu().numpy().tolist() for x in is_pad]
-            for j in range(len(pred[0])):
-                if pad[j] == 1:
-                    continue
-                if args.rank == 0:
+                pred = [torch.argmax(logits_i, dim=-1) for logits_i in logits]
+                prob = [nn.Softmax(dim=-1)(logits_i) for logits_i in logits]
+                logits = [x.cpu().numpy().tolist() for x in logits]
+                pred   = [x.cpu().numpy().tolist() for x in pred]
+                prob   = [x.cpu().numpy().tolist() for x in prob]
+                pad    = [x.cpu().numpy().tolist() for x in is_pad]
+                for j in range(len(pred[0])):
+                    if pad[j] == 1:
+                        continue
                     f.write("|".join([str(v[j]) for v in pred]))
                     if args.output_logits:
                         f.write("\t" + "|".join([" ".join(["{0:.4f}".format(w) for w in v[j]]) for v in logits]))
                     if args.output_prob:
                         f.write("\t" + "|".join([" ".join(["{0:.4f}".format(w) for w in v[j]]) for v in prob]))
                     f.write("\n")
-        f.close()
-
+            f.close()
 
 if __name__ == "__main__":
     main()

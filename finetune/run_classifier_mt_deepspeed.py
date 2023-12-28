@@ -15,58 +15,65 @@ tencentpretrain_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".
 sys.path.append(tencentpretrain_dir)
 
 from tencentpretrain.opts import *
-from tencentpretrain.model_loader import _load_state_dict_into_model
+from tencentpretrain.model_loader import load_block_model, load_state_dict_block_model
 from finetune.run_classifier import *
+
+def read_tsv(args, path):
+    datas = []
+    column = {}
+    error_num = 0
+    with open(path, mode="r", encoding="utf-8") as f:
+        for line_id, line in enumerate(f):
+            if line_id == 0:
+                for i, column_name in enumerate(line.rstrip("\r\n").split("\t")):
+                    column[column_name] = i
+                continue
+            line = line.rstrip("\r\n").split("\t")
+            if len(column) == len(line):
+                datas.append(line)
+            else:
+                error_num += 1
+    args.logger.info("{}: read {} lines with {} errors...".format(path, len(datas) - 1, error_num))
+    return datas, column
 
 def read_dataset(args, path):
     dataset, columns = [], {}
     for i in range(args.world_size):
         dataset.append([])
+    datas, columns = read_tsv(args, path)
+    num_of_rank    = math.ceil(1.0 * len(datas) / args.world_size)
     index = 0
-    with open(path, mode="r", encoding="utf-8") as f:
-        for line_id, line in enumerate(f):
-            if line_id == 0:
-                for i, column_name in enumerate(line.rstrip("\r\n").split("\t")):
-                    columns[column_name] = i
-                continue
-            line = line.rstrip("\r\n").split("\t")
-            tgt = int(line[columns["label"]])
-            if args.soft_targets and "logits" in columns.keys():
-                soft_tgt = [float(value) for value in line[columns["logits"]].split(" ")]
-            if "text_b" not in columns:  # Sentence classification.
-                text_a = line[columns["text_a"]]
-                src = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(text_a) + [SEP_TOKEN])
-                seg = [1] * len(src)
-            else:  # Sentence-pair classification.
-                text_a, text_b = line[columns["text_a"]], line[columns["text_b"]]
-                src_a = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(text_a) + [SEP_TOKEN])
-                src_b = args.tokenizer.convert_tokens_to_ids(args.tokenizer.tokenize(text_b) + [SEP_TOKEN])
-                src = src_a + src_b
-                seg = [1] * len(src_a) + [2] * len(src_b)
+    for line_id, line in enumerate(datas):
+        tgt = int(line[columns["label"]])
+        if args.soft_targets and "logits" in columns.keys():
+            soft_tgt = [float(value) for value in line[columns["logits"]].split(" ")]
+        if "text_b" not in columns:  # Sentence classification.
+            text_a = line[columns["text_a"]]
+            src = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(text_a) + [SEP_TOKEN])
+            seg = [1] * len(src)
+        else:  # Sentence-pair classification.
+            text_a, text_b = line[columns["text_a"]], line[columns["text_b"]]
+            src_a = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(text_a) + [SEP_TOKEN])
+            src_b = args.tokenizer.convert_tokens_to_ids(args.tokenizer.tokenize(text_b) + [SEP_TOKEN])
+            src = src_a + src_b
+            seg = [1] * len(src_a) + [2] * len(src_b)
 
-            if len(src) > args.seq_length:
-                src = src[: args.seq_length]
-                seg = seg[: args.seq_length]
-            PAD_ID = args.tokenizer.convert_tokens_to_ids([PAD_TOKEN])[0]
-            while len(src) < args.seq_length:
-                src.append(PAD_ID)
-                seg.append(0)
-            if args.soft_targets and "logits" in columns.keys():
-                dataset[index].append((src, tgt, seg, 0, soft_tgt))
-            else:
-                dataset[index].append((src, tgt, seg, 0))
+        if len(src) > args.seq_length:
+            src = src[: args.seq_length]
+            seg = seg[: args.seq_length]
+        PAD_ID = args.tokenizer.convert_tokens_to_ids([PAD_TOKEN])[0]
+        while len(src) < args.seq_length:
+            src.append(PAD_ID)
+            seg.append(0)
+        if args.soft_targets and "logits" in columns.keys():
+            dataset[index].append((src, tgt, seg, 0, soft_tgt))
+        else:
+            dataset[index].append((src, tgt, seg, 0))
+        if (line_id+1) % num_of_rank == 0:
             index += 1
-            if index == args.world_size:
-                index = 0
-    max_data_num_rank_index = 0
-    max_data_num = len(dataset[0])
     for i in range(args.world_size):
-        if len(dataset[i]) > max_data_num:
-            max_data_num_rank_index = i
-            max_data_num = len(dataset[i])
-    for i in range(args.world_size):
-        if len(dataset[i]) < max_data_num:
-            dataset[i].append(tuple([1 if j == 3 else dataset[max_data_num_rank_index][-1][j] for j in range(len(dataset[max_data_num_rank_index][-1]))]))
+        while len(dataset[i]) < num_of_rank:
+            dataset[i].append(tuple([1 if j == 3 else dataset[0][-1][j] for j in range(len(dataset[0][-1]))]))
     return dataset
 
 def train_model(args, model, optimizer, scheduler, src_batch, tgt_batch, seg_batch, soft_tgt_batch=None):
@@ -258,8 +265,6 @@ def main():
     args.labels_num_list = [count_labels_num(os.path.join(path, "train.tsv")) for path in args.dataset_path_list]
     
     args.datasets_num = len(args.dataset_path_list)
-
-    args.use_mp = False
     
     # Build tokenizer.
     args.tokenizer = str2tokenizer[args.tokenizer](args)
@@ -268,21 +273,11 @@ def main():
     if args.enable_zero3:
         with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
             model = MultitaskClassifier(args)
-            if os.path.isdir(args.pretrained_model_path):
-                index_filename = os.path.join(args.pretrained_model_path, "tencentpretrain_model.bin.index.json")
-                with open(index_filename, "r") as f:
-                    index = json.loads(f.read())
-                shard_filenames = sorted(set(index["weight_map"].values()))
-                shard_filenames = [os.path.join(args.pretrained_model_path, f) for f in shard_filenames]
-                for shard_file in shard_filenames:
-                    model = _load_state_dict_into_model(model, shard_file, "")
-            elif args.pretrained_model_path:
-                    model = _load_state_dict_into_model(model, args.pretrained_model_path, "")
+            model = load_state_dict_block_model(model, args.pretrained_model_path)
     else:
         model = MultitaskClassifier(args)
-
         # Load or initialize parameters.
-        load_or_initialize_parameters(args, model)
+        model = load_block_model(model, args.pretrained_model_path)
 
     # Get logger.
     args.logger = init_logger(args)
@@ -353,7 +348,7 @@ def main():
             output.append(result)
         output = torch.as_tensor(output).to(args.device)
         output_list = [torch.zeros_like(output).to(args.device) for _ in range(args.world_size)]
-        dist.all_gather(output_list, output, async_op=False)
+        dist.all_gather(output_list, output)
         if args.rank == 0:
             evaluate(args, output_list)
         model.save_checkpoint(args.output_model_path, str(epoch))
