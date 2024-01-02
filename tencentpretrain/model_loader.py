@@ -1,6 +1,5 @@
 import os
 import torch
-import json
 from tencentpretrain import mpu
 
 
