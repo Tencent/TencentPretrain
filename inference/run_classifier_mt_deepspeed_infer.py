@@ -8,32 +8,14 @@ import argparse
 import torch.nn as nn
 import deepspeed
 import torch.distributed as dist
-import json
 
 tencentpretrain_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(tencentpretrain_dir)
 
 from tencentpretrain.opts import *
-from tencentpretrain.utils.config import load_hyperparam
-from tencentpretrain.utils.logging import *
-from tencentpretrain.utils import *
-from tencentpretrain.model_loader import load_block_model, load_state_dict_block_model
-from finetune.run_classifier_mt_deepspeed import read_dataset
+from finetune.run_classifier_deepspeed import *
+from inference.run_classifier_deepspeed_infer import batch_loader
 from inference.run_classifier_mt_infer import MultitaskClassifier
-
-
-def batch_loader(batch_size, src, seg, is_pad):
-    instances_num = src.size()[0]
-    for i in range(instances_num // batch_size):
-        src_batch = src[i * batch_size : (i + 1) * batch_size, :]
-        seg_batch = seg[i * batch_size : (i + 1) * batch_size, :]
-        is_pad_batch = is_pad[i * batch_size : (i + 1) * batch_size]
-        yield src_batch, seg_batch, is_pad_batch
-    if instances_num > instances_num // batch_size * batch_size:
-        src_batch = src[instances_num // batch_size * batch_size :, :]
-        seg_batch = seg[instances_num // batch_size * batch_size :, :]
-        is_pad_batch = is_pad[instances_num // batch_size * batch_size :]
-        yield src_batch, seg_batch, is_pad_batch
 
 def predict(args, dataset):
     src = torch.LongTensor([sample[0] for sample in dataset])
@@ -88,14 +70,8 @@ def main():
     args.soft_targets, args.soft_alpha = False, False
     deepspeed.init_distributed()
     # Build multi-task classification model.
-    if args.enable_zero3:
-        with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
-            model = MultitaskClassifier(args)
-            model = load_state_dict_block_model(model, args.load_model_path)
-    else:
-        model = MultitaskClassifier(args)
-        # Load or initialize parameters.
-        model = load_block_model(model, args.load_model_path)
+    model = MultitaskClassifier(args)
+    load_model(args, model, args.load_model_path)
     model = deepspeed.initialize(model=model,config_params=args.deepspeed_config)[0]
     args.model = model
 

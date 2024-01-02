@@ -9,114 +9,13 @@ import torch
 import torch.nn as nn
 import deepspeed
 import torch.distributed as dist
-import json
 
 tencentpretrain_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(tencentpretrain_dir)
 
 from tencentpretrain.opts import *
-from tencentpretrain.model_loader import load_block_model, load_state_dict_block_model
-from finetune.run_classifier import *
-
-def read_tsv(args, path):
-    datas = []
-    column = {}
-    error_num = 0
-    with open(path, mode="r", encoding="utf-8") as f:
-        for line_id, line in enumerate(f):
-            if line_id == 0:
-                for i, column_name in enumerate(line.rstrip("\r\n").split("\t")):
-                    column[column_name] = i
-                continue
-            line = line.rstrip("\r\n").split("\t")
-            if len(column) == len(line):
-                datas.append(line)
-            else:
-                error_num += 1
-    args.logger.info("{}: read {} lines with {} errors...".format(path, len(datas) - 1, error_num))
-    return datas, column
-
-def read_dataset(args, path):
-    dataset, columns = [], {}
-    for i in range(args.world_size):
-        dataset.append([])
-    datas, columns = read_tsv(args, path)
-    num_of_rank    = math.ceil(1.0 * len(datas) / args.world_size)
-    index = 0
-    for line_id, line in enumerate(datas):
-        tgt = int(line[columns["label"]])
-        if args.soft_targets and "logits" in columns.keys():
-            soft_tgt = [float(value) for value in line[columns["logits"]].split(" ")]
-        if "text_b" not in columns:  # Sentence classification.
-            text_a = line[columns["text_a"]]
-            src = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(text_a) + [SEP_TOKEN])
-            seg = [1] * len(src)
-        else:  # Sentence-pair classification.
-            text_a, text_b = line[columns["text_a"]], line[columns["text_b"]]
-            src_a = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(text_a) + [SEP_TOKEN])
-            src_b = args.tokenizer.convert_tokens_to_ids(args.tokenizer.tokenize(text_b) + [SEP_TOKEN])
-            src = src_a + src_b
-            seg = [1] * len(src_a) + [2] * len(src_b)
-
-        if len(src) > args.seq_length:
-            src = src[: args.seq_length]
-            seg = seg[: args.seq_length]
-        PAD_ID = args.tokenizer.convert_tokens_to_ids([PAD_TOKEN])[0]
-        while len(src) < args.seq_length:
-            src.append(PAD_ID)
-            seg.append(0)
-        if args.soft_targets and "logits" in columns.keys():
-            dataset[index].append((src, tgt, seg, 0, soft_tgt))
-        else:
-            dataset[index].append((src, tgt, seg, 0))
-        if (line_id+1) % num_of_rank == 0:
-            index += 1
-    for i in range(args.world_size):
-        while len(dataset[i]) < num_of_rank:
-            dataset[i].append(tuple([1 if j == 3 else dataset[0][-1][j] for j in range(len(dataset[0][-1]))]))
-    return dataset
-
-def train_model(args, model, optimizer, scheduler, src_batch, tgt_batch, seg_batch, soft_tgt_batch=None):
-    model.zero_grad()
-
-    src_batch = src_batch.to(args.device)
-    tgt_batch = tgt_batch.to(args.device)
-    seg_batch = seg_batch.to(args.device)
-    if soft_tgt_batch is not None:
-        soft_tgt_batch = soft_tgt_batch.to(args.device)
-
-    loss, _ = model(src_batch, tgt_batch, seg_batch, soft_tgt_batch)
-    if torch.cuda.device_count() > 1:
-        loss = torch.mean(loss)
-
-    model.backward(loss)
-
-    model.step()
-
-    return loss
-
-def batch_loader(batch_size, src, tgt, seg, is_pad, soft_tgt=None):
-    instances_num = src.size()[0]
-    for i in range(instances_num // batch_size):
-        src_batch = src[i * batch_size : (i + 1) * batch_size, :]
-        tgt_batch = tgt[i * batch_size : (i + 1) * batch_size]
-        seg_batch = seg[i * batch_size : (i + 1) * batch_size, :]
-        is_pad_batch = is_pad[i * batch_size : (i + 1) * batch_size]
-        if soft_tgt is not None:
-            soft_tgt_batch = soft_tgt[i * batch_size : (i + 1) * batch_size, :]
-            yield src_batch, tgt_batch, seg_batch, is_pad_batch, soft_tgt_batch
-        else:
-            yield src_batch, tgt_batch, seg_batch, is_pad_batch, None
-    if instances_num > instances_num // batch_size * batch_size:
-        src_batch = src[instances_num // batch_size * batch_size :, :]
-        tgt_batch = tgt[instances_num // batch_size * batch_size :]
-        seg_batch = seg[instances_num // batch_size * batch_size :, :]
-        is_pad_batch = is_pad[instances_num // batch_size * batch_size :]
-        if soft_tgt is not None:
-            soft_tgt_batch = soft_tgt[instances_num // batch_size * batch_size :, :]
-            yield src_batch, tgt_batch, seg_batch, is_pad_batch, soft_tgt_batch
-        else:
-            yield src_batch, tgt_batch, seg_batch, is_pad_batch, None
+from finetune.run_classifier_deepspeed import *
+from finetune.run_classifier_mt import MultitaskClassifier
 
 def pack_dataset(dataset, dataset_id, batch_size):
     packed_dataset = []
@@ -182,44 +81,6 @@ def evaluate(args, output_list):
             args.logger.info("Label {}: {:.3f}, {:.3f}, {:.3f}".format(i, p, r, f1))
         args.logger.info("Dataset_id: {} Acc. (Correct/Total): {:.4f} ({}/{}) ".format(dataset_id, correct / total, correct, total))
 
-class MultitaskClassifier(nn.Module):
-    def __init__(self, args):
-        super(MultitaskClassifier, self).__init__()
-        self.embedding = Embedding(args)
-        for embedding_name in args.embedding:
-            tmp_emb = str2embedding[embedding_name](args, len(args.tokenizer.vocab))
-            self.embedding.update(tmp_emb, embedding_name)
-        self.encoder = str2encoder[args.encoder](args)
-        self.pooling_type = args.pooling
-        self.output_layers_1 = nn.ModuleList([nn.Linear(args.hidden_size, args.hidden_size) for _ in args.labels_num_list])
-        self.output_layers_2 = nn.ModuleList([nn.Linear(args.hidden_size, labels_num) for labels_num in args.labels_num_list])
-
-        self.dataset_id = 0
-
-    def forward(self, src, tgt, seg, soft_tgt=None):
-        """
-        Args:
-            src: [batch_size x seq_length]
-            tgt: [batch_size]
-            seg: [batch_size x seq_length]
-        """
-        # Embedding.
-        emb = self.embedding(src, seg)
-        # Encoder.
-        output = self.encoder(emb, seg)
-        # Target.
-        output = pooling(output, seg, self.pooling_type)
-        output = torch.tanh(self.output_layers_1[self.dataset_id](output))
-        logits = self.output_layers_2[self.dataset_id](output)
-        if tgt is not None:
-            loss = nn.NLLLoss()(nn.LogSoftmax(dim=-1)(logits), tgt.view(-1))
-            return loss, logits
-        else:
-            return None, logits
-
-    def change_dataset(self, dataset_id):
-        self.dataset_id = dataset_id
-
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -270,14 +131,14 @@ def main():
     args.tokenizer = str2tokenizer[args.tokenizer](args)
 
     # Build multi-task classification model.
-    if args.enable_zero3:
-        with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
-            model = MultitaskClassifier(args)
-            model = load_state_dict_block_model(model, args.pretrained_model_path)
+    model = MultitaskClassifier(args)
+    if args.pretrained_model_path:
+        load_model(args, model, args.pretrained_model_path)
     else:
-        model = MultitaskClassifier(args)
-        # Load or initialize parameters.
-        model = load_block_model(model, args.pretrained_model_path)
+        # Initialize with normal distribution.
+        for n, p in list(model.named_parameters()):
+            if "gamma" not in n and "beta" not in n:
+                p.data.normal_(0, 0.02)
 
     # Get logger.
     args.logger = init_logger(args)

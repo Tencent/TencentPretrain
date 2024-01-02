@@ -14,13 +14,10 @@ import torch.distributed as dist
 tencentpretrain_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(tencentpretrain_dir)
 
-
-from tencentpretrain.opts import deepspeed_opts
-from inference.run_classifier_infer import *
-from finetune.run_classifier_deepspeed import read_dataset
-from tencentpretrain.model_loader import load_block_model, load_state_dict_block_model
-from tencentpretrain.utils.logging import *
 from tencentpretrain.opts import *
+from inference.run_classifier_infer import *
+from tencentpretrain.utils.logging import *
+from finetune.run_classifier_deepspeed import read_dataset, load_model
 
 def batch_loader(batch_size, src, seg, is_pad):
     instances_num = src.size()[0]
@@ -80,23 +77,15 @@ def main():
     # Load the hyperparameters from the config file.
     args = load_hyperparam(args)
 
-    args.use_mp = False
-
     # Build tokenizer.
     args.tokenizer = str2tokenizer[args.tokenizer](args)
 
     # Build classification model and load parameters.
     args.soft_targets, args.soft_alpha = False, False
     deepspeed.init_distributed()
-    # Build multi-task classification model.
-    if args.enable_zero3:
-        with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
-            model = Classifier(args)
-            model = load_state_dict_block_model(model, args.load_model_path)
-    else:
-        model = Classifier(args)
-        # Load or initialize parameters.
-        model = load_block_model(model, args.load_model_path)
+    # Build classification model.
+    model = Classifier(args)
+    load_model(args, model, args.load_model_path)
     
     # Get logger.
     args.logger = init_logger(args)

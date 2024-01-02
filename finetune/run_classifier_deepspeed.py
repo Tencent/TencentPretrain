@@ -14,9 +14,8 @@ tencentpretrain_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".
 sys.path.append(tencentpretrain_dir)
 
 from tencentpretrain.opts import deepspeed_opts
-from tencentpretrain.model_loader import *
 from finetune.run_classifier import *
-
+from tencentpretrain.model_loader import _load_state_dict_into_model
 
 def read_tsv(args, path):
     datas = []
@@ -41,7 +40,7 @@ def read_dataset(args, path):
     for i in range(args.world_size):
         dataset.append([])
     datas, columns = read_tsv(args, path)
-    num_of_rank    = math.ceil(1.0 * len(datas) / args.world_size)
+    rank_num    = math.ceil(1.0 * len(datas) / args.world_size)
     index = 0
     for line_id, line in enumerate(datas):
         tgt = int(line[columns["label"]])
@@ -69,12 +68,39 @@ def read_dataset(args, path):
             dataset[index].append((src, tgt, seg, 0, soft_tgt))
         else:
             dataset[index].append((src, tgt, seg, 0))
-        if (line_id+1) % num_of_rank == 0:
+        if (line_id+1) % rank_num == 0:
             index += 1
     for i in range(args.world_size):
-        while len(dataset[i]) < num_of_rank:
+        while len(dataset[i]) < rank_num:
             dataset[i].append(tuple([1 if j == 3 else dataset[0][-1][j] for j in range(len(dataset[0][-1]))]))
     return dataset
+
+def load_model(args, model, model_path):
+    if args.enable_zero3:
+        with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
+            if os.path.isdir(model_path):
+                index_filename = os.path.join(model_path, "tencentpretrain_model.bin.index.json")
+                with open(index_filename, "r") as f:
+                    index = json.loads(f.read())
+                shard_filenames = sorted(set(index["weight_map"].values()))
+                shard_filenames = [os.path.join(model_path, f) for f in shard_filenames]
+                for shard_file in shard_filenames:
+                    model = _load_state_dict_into_model(model, shard_file, "")
+            elif model_path is not None:
+                model = _load_state_dict_into_model(model, model_path, "")
+    else:
+        if os.path.isdir(model_path):
+            index_filename = os.path.join(model_path, "tencentpretrain_model.bin.index.json")
+            with open(index_filename, "r") as f:
+                index = json.loads(f.read())
+            shard_filenames = sorted(set(index["weight_map"].values()))
+            shard_filenames = [os.path.join(model_path, f) for f in shard_filenames]
+            for shard_file in shard_filenames:
+                model.load_state_dict(torch.load(shard_file, map_location="cpu"), strict=False)
+        elif model_path is not None:
+            # Initialize with pretrained model.
+            model.load_state_dict(torch.load(model_path, map_location="cpu"), strict=False)
+    return model
 
 def train_model(args, model, optimizer, scheduler, src_batch, tgt_batch, seg_batch, soft_tgt_batch=None):
     model.zero_grad()
@@ -200,14 +226,14 @@ def main():
     args.tokenizer = str2tokenizer[args.tokenizer](args)
 
     # Build multi-task classification model.
-    if args.enable_zero3:
-        with deepspeed.zero.Init(config_dict_or_path=args.deepspeed_config):
-            model = Classifier(args)
-            model = load_state_dict_block_model(model, args.pretrained_model_path)
+    model = Classifier(args)
+    if args.pretrained_model_path:
+        load_model(args, model, args.pretrained_model_path)
     else:
-        model = Classifier(args)
-        # Load or initialize parameters.
-        model = load_block_model(model, args.pretrained_model_path)
+        # Initialize with normal distribution.
+        for n, p in list(model.named_parameters()):
+            if "gamma" not in n and "beta" not in n:
+                p.data.normal_(0, 0.02)
 
     # Get logger.
     args.logger = init_logger(args)
