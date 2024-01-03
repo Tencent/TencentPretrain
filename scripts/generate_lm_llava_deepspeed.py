@@ -175,6 +175,8 @@ if __name__ == '__main__':
         "sys3": "<SYS> You are a helpful language and vision assistant. </SYS> \n",
         "sys4": "[INST]<<SYS>>\nYou are a helpful language and vision assistant. You are able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.\n<</SYS>>\n\n"
     }
+    role1, role2 = "USER", "ASSISTANT"
+    im_start, im_end = "<Image>", "</Image>"
     num_image_tokens = int(image_width / patch_size) * int(image_height / patch_size) + 1 # 336/14-14 --> 576 dim + 1
     seq_text = args.seq_length - num_image_tokens
     outf = open(args.prediction_path, mode="w", encoding="utf-8")
@@ -200,7 +202,7 @@ if __name__ == '__main__':
             print("sth wrong with item{}".format(item))
             continue
 
-        prompt_before_image = prompt_overall + " USER: "
+        prompt_before_image = prompt_overall + " " + role1 + ": "
         ground_truth = []
         prompt_answer_id = []
         if "conversations" in item:
@@ -212,14 +214,14 @@ if __name__ == '__main__':
                 if i == 0:
                     prompt = conv["value"]
                     if prompt.endswith("<image>"):
-                        prompt_before_image = prompt_before_image + prompt.replace("<image>","<Image>")
-                        prompt_after_image = "</Image>\nASSISTANT:"
+                        prompt_before_image = prompt_before_image + prompt.replace("<image>", im_start)
+                        prompt_after_image = im_end + "\n" + role2 + ": "
                     elif prompt.startswith("<image>"):
-                        prompt_before_image = prompt_before_image + "<Image>"
-                        prompt_after_image = prompt.replace("<image>","</Image>") + "\nASSISTANT: "
+                        prompt_before_image = prompt_before_image + im_start
+                        prompt_after_image = prompt.replace("<image>", im_end) + "\n" + role2 + ": "
                     else:
-                        prompt_before_image = prompt_before_image + "<Image>"
-                        prompt_after_image = "</Image>\n" + prompt + " ASSISTANT: "
+                        prompt_before_image = prompt_before_image + im_start
+                        prompt_after_image = im_end + "\n" + prompt + " " + role2 + ": "
 
                     prompt_before_image_id = args.tokenizer.convert_tokens_to_ids(
                         args.tokenizer.tokenize(prompt_before_image)
@@ -237,7 +239,7 @@ if __name__ == '__main__':
                 elif i % 2 == 0: # human
                     prompt = conv["value"]
                     prompt_id = args.tokenizer.convert_tokens_to_ids(
-                        args.tokenizer.tokenize(" USER: " + prompt + " ASSISTANT: ")
+                        args.tokenizer.tokenize(role1 + ": " + prompt + " " + role2 + ": ")
                     )
                     if prompt_answer_id:
                         prompt_answer_id.append(prompt_id)
@@ -249,8 +251,8 @@ if __name__ == '__main__':
                     ground_truth.append(conv["value"])
         else:
             prompt = item["instruction"]
-            prompt_before_image = prompt_before_image + "<Image>"
-            prompt_after_image = "</Image>\n" + prompt + "\nASSISTANT: "
+            prompt_before_image = prompt_before_image + im_start
+            prompt_after_image = im_end + "\n" + prompt + "\n" + role2 + ": "
             prompt_before_image_id = args.tokenizer.convert_tokens_to_ids(
                 args.tokenizer.tokenize(prompt_before_image)
             )
