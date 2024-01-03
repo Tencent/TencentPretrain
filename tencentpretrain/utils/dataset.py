@@ -970,109 +970,6 @@ class FileWithTextDataset(Dataset):
         dataset_writer.close()
 
 
-class FileWithTextJsonDataset(Dataset):
-    def worker(self, proc_id, start, end):
-        import json
-        num_image_tokens = int(self.args.image_width / self.args.patch_size) * int(self.args.image_height / self.args.patch_size) + 1 
-        seq_text = self.seq_length - num_image_tokens
-        PAD_ID = self.tokenizer.convert_tokens_to_ids([PAD_TOKEN])[0]
-        instruction_template = {
-        "sys1": "<<SYS>>\nYou are a helpful language and vision assistant. You are able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.\n<</SYS>>\n\n",
-        "sys2": "<<SYS>>\nA chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions.\n<</SYS>>\n\n"
-        }
-        try:
-            if self.args.instruction_template == "sys1":
-                instruction_overall = instruction_template["sys1"]
-            elif self.args.instruction_template == "sys2":
-                instruction_overall = instruction_template["sys2"]
-        except:
-            print("unsupported instruction template!")
-            NotImplementedError
-
-        print("Worker %d is building dataset ... " % proc_id)
-        set_seed(self.seed)
-        dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
-        pos = start
-        skip_item = 0
-        with open(self.corpus_path, mode="r", encoding="utf-8") as f:
-            datas = json.load(f)
-            while True:
-                item = datas[pos]
-                pos += 1
-                try:
-                    path = item["image"]
-                    if not os.path.isfile(path):
-                        continue
-                except:
-                    skip_item += 1
-                    continue
-                conversations = item["conversations"]
-
-                prompt_before_image = instruction_overall + " USER:"
-                text_combine_seg_nums, tgt_seg_nums = [], []
-                for i, conv in enumerate(conversations):
-                    if i == 0:
-                        prompt = conv["value"]
-                        if prompt.endswith("<image>"):
-                            prompt_before_image = prompt_before_image + prompt.replace("<image>","<Image>")
-                            prompt_after_image = "</sImage>\nASSISTANT:"
-                        elif prompt.startswith("<image>"):
-                            prompt_before_image = prompt_before_image + "<Image>"
-                            prompt_after_image = prompt.replace("<image>","</Image>") + "\nASSISTANT:"
-                        prompt_before_image_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(prompt_before_image))
-                        prompt_after_image_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(prompt_after_image))
-                        seg_before_image = [1] * len(prompt_before_image_id)
-                        seg_after_image = [1] * len(prompt_after_image_id)
-                        if len(prompt_before_image_id) + len(prompt_after_image_id) > seq_text:
-                            print("promt too long, jump for now")
-                            continue
-                        text_combine_id =  prompt_before_image_id + prompt_after_image_id
-                        tgt_id = [PAD_ID] * (len(text_combine_id) + num_image_tokens - 1)
-                        tgt_seg_nums = [len(tgt_id)]
-                    elif i % 2 == 0: # human
-                        prompt = conv["value"]
-                        prompt_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(" USER:" + prompt + "\nASSISTANT:"))
-                        text_combine_id = text_combine_id + prompt_id
-                        tgt_id = tgt_id + [PAD_ID] * len(prompt_id)
-                        if len(tgt_seg_nums) == 1:
-                            tgt_seg_nums[0] = tgt_seg_nums[0] + len(prompt_id)
-                        else:
-                            tgt_seg_nums = tgt_seg_nums + [len(prompt_id)]
-                    else: # gpt
-                        answer = conv["value"]
-                        answer_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(answer) + [SEP_TOKEN])
-                        text_combine_id = text_combine_id + answer_id
-                        tgt_id = tgt_id + answer_id
-                        tgt_seg_nums = tgt_seg_nums + [len(answer_id)]
-
-                if len(tgt_id) > self.seq_length:
-                    tgt_id = tgt_id[:self.seq_length]
-                pad_num = self.seq_length - len(tgt_id)
-                tgt_id = tgt_id + [PAD_ID] * pad_num
-                while sum(tgt_seg_nums) > self.seq_length:
-                    tgt_seg_nums = tgt_seg_nums[:-1]
-                pad_num = self.seq_length - sum(tgt_seg_nums)
-                tgt_seg_nums = tgt_seg_nums + [pad_num]
-
-                if len(text_combine_id) > seq_text :
-                    text_combine_id = text_combine_id[:seq_text]
-
-                pad_num = seq_text - len(text_combine_id)
-                text_combine_seg_nums = [len(text_combine_id), pad_num]
-                text_combine_id = text_combine_id + [PAD_ID] * pad_num
-
-                image_pos = len(prompt_before_image_id)
-                src = (text_combine_id, tgt_id)
-                seg_nums = (text_combine_seg_nums, tgt_seg_nums)
-                image = (path, image_pos)
-                pickle.dump((src, seg_nums, image), dataset_writer)
-
-                if pos >= end:
-                    break
-
-        dataset_writer.close()
-
-
 class FileWithLabelDataset(Dataset):
     def worker(self, proc_id, start, end):
         print("Worker %d is building dataset ... " % proc_id)
@@ -1189,5 +1086,92 @@ class LlmSftDataset(Dataset):
         dataset_writer.close()
 
 
-class LlavaDataset(FileWithTextJsonDataset):
-    pass
+class LlavaDataset(Dataset):
+    def worker(self, proc_id, start, end):
+        import json
+        num_image_tokens = self.args.vision_seq_length_in_VL
+        seq_text = self.seq_length - num_image_tokens
+        PAD_ID = self.tokenizer.convert_tokens_to_ids([PAD_TOKEN])[0]
+
+        print("Worker %d is building dataset ... " % proc_id)
+        set_seed(self.seed)
+        dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
+        pos = start
+        skip_item = 0
+        with open(self.corpus_path, mode="r", encoding="utf-8") as f:
+            datas = json.load(f)
+            while True:
+                item = datas[pos]
+                pos += 1
+                try:
+                    path = item["image"]
+                    if not os.path.isfile(path):
+                        continue
+                except:
+                    skip_item += 1
+                    continue
+                conversations = item["conversations"]
+
+                prompt_before_image = " USER: "
+                prompt_answer_seg_nums, tgt_seg_nums = [], []
+                for i, conv in enumerate(conversations):
+                    if i == 0:
+                        prompt = conv["value"]
+                        if prompt.endswith("<image>"):
+                            prompt_before_image = prompt_before_image + prompt.replace("<image>","<Image>")
+                            prompt_after_image = "</Image>\nASSISTANT: "
+                        elif prompt.startswith("<image>"):
+                            prompt_before_image = prompt_before_image + "<Image>"
+                            prompt_after_image = prompt.replace("<image>","</Image>") + "\nASSISTANT: "
+                        prompt_before_image_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(prompt_before_image))
+                        prompt_after_image_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(prompt_after_image))
+                        seg_before_image = [1] * len(prompt_before_image_id)
+                        seg_after_image = [1] * len(prompt_after_image_id)
+                        if len(prompt_before_image_id) + len(prompt_after_image_id) > seq_text:
+                            print("promt too long, jumped")
+                            continue
+                        prompt_answer_id =  prompt_before_image_id + prompt_after_image_id
+                        tgt_id = [PAD_ID] * (len(prompt_answer_id) + num_image_tokens - 1)
+                        tgt_seg_nums = [len(tgt_id)]
+                    elif i % 2 == 0: # human
+                        prompt = conv["value"]
+                        prompt_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(" USER: " + prompt + "\nASSISTANT: "))
+                        prompt_answer_id = prompt_answer_id + prompt_id
+                        tgt_id = tgt_id + [PAD_ID] * len(prompt_id)
+                        if len(tgt_seg_nums) == 1:
+                            tgt_seg_nums[0] = tgt_seg_nums[0] + len(prompt_id)
+                        else:
+                            tgt_seg_nums = tgt_seg_nums + [len(prompt_id)]
+                    else: # gpt
+                        answer = conv["value"]
+                        answer_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(answer) + [SEP_TOKEN])
+                        prompt_answer_id = prompt_answer_id + answer_id
+                        tgt_id = tgt_id + answer_id
+                        tgt_seg_nums = tgt_seg_nums + [len(answer_id)]
+
+                if len(tgt_id) > self.seq_length:
+                    tgt_id = tgt_id[:self.seq_length]
+                pad_num = self.seq_length - len(tgt_id)
+                tgt_id = tgt_id + [PAD_ID] * pad_num
+                while sum(tgt_seg_nums) > self.seq_length:
+                    tgt_seg_nums = tgt_seg_nums[:-1]
+                pad_num = self.seq_length - sum(tgt_seg_nums)
+                tgt_seg_nums = tgt_seg_nums + [pad_num]
+
+                if len(prompt_answer_id) > seq_text :
+                    prompt_answer_id = prompt_answer_id[:seq_text]
+
+                pad_num = seq_text - len(prompt_answer_id)
+                prompt_answer_seg_nums = [len(prompt_answer_id), pad_num]
+                prompt_answer_id = prompt_answer_id + [PAD_ID] * pad_num
+
+                image_pos = len(prompt_before_image_id)
+                src = (prompt_answer_id, tgt_id)
+                seg_nums = (prompt_answer_seg_nums, tgt_seg_nums)
+                image = (path, image_pos)
+                pickle.dump((src, seg_nums, image), dataset_writer)
+
+                if pos >= end:
+                    break
+
+        dataset_writer.close()

@@ -553,6 +553,9 @@ class VisionDataloader(Dataloader):
         preprocess_pipeline = []
         if "corp" in args.image_preprocess:
             preprocess_pipeline.append(transforms.RandomResizedCrop(max(self.image_height, self.image_width)))
+        elif "center_crop" in args.image_preprocess:
+            preprocess_pipeline.append(transforms.Resize(min(self.image_height, self.image_width)))
+            preprocess_pipeline.append(transforms.CenterCrop((self.image_height, self.image_width)))
         if "horizontal_flip" in args.image_preprocess:
             preprocess_pipeline.append(transforms.RandomHorizontalFlip())
         preprocess_pipeline.append(transforms.Resize((self.image_height, self.image_width)))

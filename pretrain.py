@@ -13,8 +13,8 @@ def main():
                         help="Path of the preprocessed dataset.")
     parser.add_argument("--pretrained_model_path", type=str, default=None,
                         help="Path of the pretrained model.")
-    parser.add_argument("--vision_model_path", type=str, default=None,
-                        help="Path of the vision pretrained model.")
+    parser.add_argument("--vision_model_in_VL_emb_path", type=str, default=None,
+                        help="Path of the vision pretrained model in the vision language embedding.")
     parser.add_argument("--output_model_path", type=str, required=True,
                         help="Path of the output model.")
     parser.add_argument("--config_path", type=str, default="models/bert/base_config.json",
@@ -44,6 +44,8 @@ def main():
 
     # Model options.
     model_opts(parser)
+    parser.add_argument("--vision_model_missing_prefix", type=str, required=False, default="embedding.vision_language.vision_",
+                        help="Extra prefix when loading the vision pretrained model as the embedding of the whole model.")
 
     # Model parallelism options.
     mp_opts(parser)

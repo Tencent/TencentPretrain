@@ -70,7 +70,7 @@ def vision_opts(parser):
     parser.add_argument("--channels_num", type=int, default=3,
                         help="Channels num.")
     parser.add_argument("--image_preprocess", type=str, default=["crop", "normalize"], nargs='+',
-                        help="Preprocess and data augmentation methods. Choices: [\"crop\", \"horizontal_flip\", \"normalize\"]. ")
+                        help="Preprocess and data augmentation methods. Choices: [\"crop\", \"center_crop\", \"horizontal_flip\", \"normalize\"]. ")
 
 
 def audio_opts(parser):

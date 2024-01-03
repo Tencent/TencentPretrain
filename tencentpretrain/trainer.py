@@ -94,9 +94,9 @@ def init_model(args):
     else:
         model_for_dataloader = None
 
-    if args.vision_model_path is not None:
-        args.logger.info("loading: {}".format(args.vision_model_path))
-        model_for_training = _load_state_dict_into_model(model_for_training, args.vision_model_path, missing_prefix=args.vision_model_missing_prefix)
+    if args.vision_model_in_VL_emb_path is not None:
+        args.logger.info("loading: {}".format(args.vision_model_in_VL_emb_path))
+        model_for_training = _load_state_dict_into_model(model_for_training, args.vision_model_in_VL_emb_path, missing_prefix=args.vision_model_missing_prefix)
         # model_for_training = load_model(model_for_training, args.vision_model_path)
     return model_for_training, model_for_dataloader
     
@@ -657,7 +657,7 @@ class LlmSftTrainer(LmTrainer):
 class LlavaTrainer(LmTrainer):
     def forward_propagation(self, batch, model):
         src_text, src_img, tgt, seg_text, seg_img, seg_tgt, image_pos = batch
-        seg = torch.cat((seg_img, seg_text), 1)
+        seg = torch.cat((seg_img[:,1:], seg_text), 1)
         loss = model((src_text, src_img, seg_text, seg_img, image_pos), tgt, seg, tgt_seg=seg_tgt)
 
         self.total_loss += loss.item()

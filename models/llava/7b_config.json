@@ -1,7 +1,10 @@
 {
-    "embedding": ["image_text"],
-    "image_text_emb":{
+    "embedding": ["vision_language"],
+    "vision_language_emb":{
       "vision_encoder":{
+        "image_height": 336,
+        "image_width": 336,
+        "patch_size": 14,
         "emb_size": 1024,
         "feedforward_size": 4096,
         "hidden_size": 1024,
@@ -19,7 +22,8 @@
         "feed_forward": "dense",
         "mask": "fully_visible",
         "layernorm_positioning": "pre",
-        "layernorm":"normal"
+        "layernorm":"normal",
+        "has_cls": false
       },
       "projection":{
         "mlp_hidden_size": 4096,
@@ -29,10 +33,6 @@
         "embedding": ["word"]
       }
     },
-    "image_height": 336,
-    "image_width": 336,
-    "patch_size": 14,
-    "remove_embedding_combine_layernorm": true,
     "emb_size": 4096,
     "feedforward_size": 11008,
     "hidden_size": 4096,
@@ -50,5 +50,6 @@
     "mask": "causal",
     "layernorm_positioning": "pre",
     "layernorm": "rms",
+    "layernorm_eps": 1e-5,
     "target": ["lm"]
   }

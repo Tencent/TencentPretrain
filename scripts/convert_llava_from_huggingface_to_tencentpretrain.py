@@ -39,7 +39,7 @@ def get_weight_from_name(layer_name):
 def unpermute(w):
     return w.reshape(n_heads, 2, dim // n_heads // 2, dim).transpose(2, 1).reshape(dim, dim)
 
-output_model["embedding.image_text.text_embedding.word.embedding.weight"] = get_weight_from_name("model.embed_tokens.weight")
+output_model["embedding.vision_language.text_embedding.word.embedding.weight"] = get_weight_from_name("model.embed_tokens.weight")
 
 for i in range(layers_num):
 
@@ -69,9 +69,9 @@ for i in range(layers_num):
 output_model["encoder.layer_norm.weight"] = get_weight_from_name("model.norm.weight")
 output_model["target.lm.output_layer.weight"] = get_weight_from_name("lm_head.weight")
 
-output_model["embedding.image_text.projection.0.weight"] = get_weight_from_name("model.mm_projector.0.weight")
-output_model["embedding.image_text.projection.0.bias"] = get_weight_from_name("model.mm_projector.0.bias")
-output_model["embedding.image_text.projection.2.weight"] = get_weight_from_name("model.mm_projector.2.weight")
-output_model["embedding.image_text.projection.2.bias"] = get_weight_from_name("model.mm_projector.2.bias")
+output_model["embedding.vision_language.projection.0.weight"] = get_weight_from_name("model.mm_projector.0.weight")
+output_model["embedding.vision_language.projection.0.bias"] = get_weight_from_name("model.mm_projector.0.bias")
+output_model["embedding.vision_language.projection.2.weight"] = get_weight_from_name("model.mm_projector.2.weight")
+output_model["embedding.vision_language.projection.2.bias"] = get_weight_from_name("model.mm_projector.2.bias")
 
 torch.save(output_model, args.output_model_path)

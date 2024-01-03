@@ -12,15 +12,15 @@ from tencentpretrain.encoders import str2encoder,TransformerEncoder
 str2embedding = {"word": WordEmbedding, "pos": PosEmbedding, "patch": PatchEmbedding}
 
 
-class ImageTextEmbedding(nn.Module):
+class VisionLanguageEmbedding(nn.Module):
     '''
     an combination of a vision encoder and a text embedding
     '''
     def __init__(self, args, vocab_size):
-        super(ImageTextEmbedding, self).__init__()
+        super(VisionLanguageEmbedding, self).__init__()
         # vision model for vision features
         vision_encoder_args = copy.deepcopy(vars(args))
-        vision_encoder_args.update(args.image_text_emb["vision_encoder"])
+        vision_encoder_args.update(args.vision_language_emb["vision_encoder"])
         vision_encoder_args = Namespace(**vision_encoder_args)
         self.vision_embedding = Embedding(vision_encoder_args)
         for embedding_name in vision_encoder_args.embedding:
@@ -30,7 +30,7 @@ class ImageTextEmbedding(nn.Module):
 
         # map the output of vision model into the same space as the text features
         projection_args = copy.deepcopy(vars(args))
-        projection_args.update(args.image_text_emb["projection"])
+        projection_args.update(args.vision_language_emb["projection"])
         projection_args = Namespace(**projection_args)
         projection_modules = [nn.Linear(vision_encoder_args.emb_size, projection_args.mlp_hidden_size)]
         for _ in range(1, projection_args.num_mlp_layer):
@@ -40,7 +40,7 @@ class ImageTextEmbedding(nn.Module):
 
         # text embedding
         text_args = copy.deepcopy(vars(args))
-        text_args.update(args.image_text_emb["text"])
+        text_args.update(args.vision_language_emb["text"])
         text_args = Namespace(**text_args)
         self.text_embedding = Embedding(text_args)
         for embedding_name in text_args.embedding:
@@ -52,7 +52,7 @@ class ImageTextEmbedding(nn.Module):
         # image features
         with torch.no_grad():
             image_emb = self.vision_embedding(src_image, seg_image)
-            image_emb = self.vision_encoder(image_emb, seg_image)
+            image_emb = self.vision_encoder(image_emb, seg_image)[:,1:,:]
         image_emb = self.projection(image_emb)
         # text embedding
         text_emb = self.text_embedding(src_text, seg_text)
