@@ -1089,10 +1089,11 @@ class LlmSftDataset(Dataset):
 class LlavaDataset(Dataset):
     def worker(self, proc_id, start, end):
         import json
-        num_image_tokens = self.args.vision_seq_length_in_VL
+        num_image_tokens = self.args.vision_seq_length_in_VL # 576
         seq_text = self.seq_length - num_image_tokens
         PAD_ID = self.tokenizer.convert_tokens_to_ids([PAD_TOKEN])[0]
-
+        role1, role2 = "USER", "ASSISTANT"
+        im_start, im_end = "<Image>", "</Image>"
         print("Worker %d is building dataset ... " % proc_id)
         set_seed(self.seed)
         dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
@@ -1112,17 +1113,17 @@ class LlavaDataset(Dataset):
                     continue
                 conversations = item["conversations"]
 
-                prompt_before_image = " USER: "
+                prompt_before_image = role1 + ": "
                 prompt_answer_seg_nums, tgt_seg_nums = [], []
                 for i, conv in enumerate(conversations):
                     if i == 0:
                         prompt = conv["value"]
                         if prompt.endswith("<image>"):
-                            prompt_before_image = prompt_before_image + prompt.replace("<image>","<Image>")
-                            prompt_after_image = "</Image>\nASSISTANT: "
+                            prompt_before_image = prompt_before_image + prompt.replace("<image>", im_start)
+                            prompt_after_image = im_end + "\n" + role2 + ": "
                         elif prompt.startswith("<image>"):
-                            prompt_before_image = prompt_before_image + "<Image>"
-                            prompt_after_image = prompt.replace("<image>","</Image>") + "\nASSISTANT: "
+                            prompt_before_image = prompt_before_image + im_start
+                            prompt_after_image = prompt.replace("<image>", im_end) + "\n" + role2 + ": "
                         prompt_before_image_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(prompt_before_image))
                         prompt_after_image_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(prompt_after_image))
                         seg_before_image = [1] * len(prompt_before_image_id)
@@ -1135,7 +1136,7 @@ class LlavaDataset(Dataset):
                         tgt_seg_nums = [len(tgt_id)]
                     elif i % 2 == 0: # human
                         prompt = conv["value"]
-                        prompt_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(" USER: " + prompt + "\nASSISTANT: "))
+                        prompt_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(role1 + ": " + prompt + "\n" + role2 + ": "))
                         prompt_answer_id = prompt_answer_id + prompt_id
                         tgt_id = tgt_id + [PAD_ID] * len(prompt_id)
                         if len(tgt_seg_nums) == 1:
