@@ -17,32 +17,23 @@ from tencentpretrain.opts import deepspeed_opts
 from finetune.run_classifier import *
 from tencentpretrain.model_loader import _load_state_dict_into_model
 
-def read_tsv(args, path):
-    datas = []
-    column = {}
-    error_num = 0
+def read_dataset(args, path):
+    dataset, instances, columns = [], [], {}
+    for i in range(args.world_size):
+        dataset.append([])
     with open(path, mode="r", encoding="utf-8") as f:
         for line_id, line in enumerate(f):
             if line_id == 0:
                 for i, column_name in enumerate(line.rstrip("\r\n").split("\t")):
-                    column[column_name] = i
+                    columns[column_name] = i
                 continue
             line = line.rstrip("\r\n").split("\t")
-            if len(column) == len(line):
-                datas.append(line)
-            else:
-                error_num += 1
-    args.logger.info("{}: read {} lines with {} errors...".format(path, len(datas) - 1, error_num))
-    return datas, column
-
-def read_dataset(args, path):
-    dataset, columns = [], {}
-    for i in range(args.world_size):
-        dataset.append([])
-    datas, columns = read_tsv(args, path)
-    rank_num    = math.ceil(1.0 * len(datas) / args.world_size)
+            if len(columns) != len(line):
+                continue
+            instances.append(line)
+    rank_num = math.ceil(1.0 * len(instances) / args.world_size)
     index = 0
-    for line_id, line in enumerate(datas):
+    for line_id, line in enumerate(instances):
         tgt = int(line[columns["label"]])
         if args.soft_targets and "logits" in columns.keys():
             soft_tgt = [float(value) for value in line[columns["logits"]].split(" ")]
@@ -98,7 +89,6 @@ def load_model(args, model, model_path):
             for shard_file in shard_filenames:
                 model.load_state_dict(torch.load(shard_file, map_location="cpu"), strict=False)
         elif model_path is not None:
-            # Initialize with pretrained model.
             model.load_state_dict(torch.load(model_path, map_location="cpu"), strict=False)
     return model
 
@@ -145,14 +135,10 @@ def batch_loader(batch_size, src, tgt, seg, is_pad, soft_tgt=None):
             yield src_batch, tgt_batch, seg_batch, is_pad_batch, None
 
 def predict(args, dataset):
-    src = torch.LongTensor([example[0] for example in dataset])
-    tgt = torch.LongTensor([example[1] for example in dataset])
-    seg = torch.LongTensor([example[2] for example in dataset])
-    is_pad = torch.LongTensor([example[3] for example in dataset])
-    if args.soft_targets:
-        soft_tgt = torch.FloatTensor([example[4] for example in dataset])
-    else:
-        soft_tgt = None
+    src = torch.LongTensor([sample[0] for sample in dataset])
+    tgt = torch.LongTensor([sample[1] for sample in dataset])
+    seg = torch.LongTensor([sample[2] for sample in dataset])
+    is_pad = torch.LongTensor([sample[3] for sample in dataset])
 
     batch_size = args.batch_size
 
@@ -265,13 +251,13 @@ def main():
         lr_scheduler=custom_scheduler,
         mpu=None,
         dist_init_required=False)
-    
-    src = torch.LongTensor([example[0] for example in trainset])
-    tgt = torch.LongTensor([example[1] for example in trainset])
-    seg = torch.LongTensor([example[2] for example in trainset])
-    is_pad = torch.LongTensor([example[3] for example in trainset])
+
+    src = torch.LongTensor([sample[0] for sample in trainset])
+    tgt = torch.LongTensor([sample[1] for sample in trainset])
+    seg = torch.LongTensor([sample[2] for sample in trainset])
+    is_pad = torch.LongTensor([sample[3] for sample in trainset])
     if args.soft_targets:
-        soft_tgt = torch.FloatTensor([example[4] for example in trainset])
+        soft_tgt = torch.FloatTensor([sample[4] for sample in trainset])
     else:
         soft_tgt = None
 
@@ -288,7 +274,7 @@ def main():
 
     for epoch in range(1, args.epochs_num + 1):
         model.train()
-        for i, (src_batch, tgt_batch, seg_batch, is_pad_batch, soft_tgt_batch) in enumerate(batch_loader(batch_size, src, tgt, seg, is_pad, soft_tgt)):
+        for i, (src_batch, tgt_batch, seg_batch, _, soft_tgt_batch) in enumerate(batch_loader(batch_size, src, tgt, seg, is_pad, soft_tgt)):
             loss = train_model(args, model, optimizer, scheduler, src_batch, tgt_batch, seg_batch, soft_tgt_batch)
             total_loss += loss.item()
             if (i + 1) % args.report_steps == 0 and args.rank == 0:

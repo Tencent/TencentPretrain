@@ -188,7 +188,7 @@ def main():
     for epoch in range(1, args.epochs_num + 1):
         random.shuffle(packed_dataset_all)
         model.train()
-        for i, (dataset_id, src_batch, tgt_batch, seg_batch, is_pad_batch) in enumerate(packed_dataset_all):
+        for i, (dataset_id, src_batch, tgt_batch, seg_batch, _) in enumerate(packed_dataset_all):
             if hasattr(model, "module"):
                 model.module.change_dataset(dataset_id)
             else:
