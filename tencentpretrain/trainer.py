@@ -96,8 +96,7 @@ def init_model(args):
 
     if args.vision_model_in_VL_emb_path is not None:
         args.logger.info("loading: {}".format(args.vision_model_in_VL_emb_path))
-        model_for_training = _load_state_dict_into_model(model_for_training, args.vision_model_in_VL_emb_path, missing_prefix=args.vision_model_missing_prefix)
-        # model_for_training = load_model(model_for_training, args.vision_model_path)
+        model_for_training = _load_state_dict_into_model(model_for_training, args.vision_model_in_VL_emb_path)
     return model_for_training, model_for_dataloader
     
 

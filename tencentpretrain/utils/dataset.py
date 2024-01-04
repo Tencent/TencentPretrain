@@ -1089,8 +1089,6 @@ class LlmSftDataset(Dataset):
 class LlavaDataset(Dataset):
     def worker(self, proc_id, start, end):
         import json
-        num_image_tokens = self.args.vision_seq_length_in_VL # 576
-        seq_text = self.seq_length - num_image_tokens
         PAD_ID = self.tokenizer.convert_tokens_to_ids([PAD_TOKEN])[0]
         role1, role2 = "USER", "ASSISTANT"
         im_start, im_end = "<Image>", "</Image>"
@@ -1100,9 +1098,9 @@ class LlavaDataset(Dataset):
         pos = start
         skip_item = 0
         with open(self.corpus_path, mode="r", encoding="utf-8") as f:
-            datas = json.load(f)
+            data = json.load(f)
             while True:
-                item = datas[pos]
+                item = data[pos]
                 pos += 1
                 try:
                     path = item["image"]
@@ -1128,11 +1126,11 @@ class LlavaDataset(Dataset):
                         prompt_after_image_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(prompt_after_image))
                         seg_before_image = [1] * len(prompt_before_image_id)
                         seg_after_image = [1] * len(prompt_after_image_id)
-                        if len(prompt_before_image_id) + len(prompt_after_image_id) > seq_text:
+                        if len(prompt_before_image_id) + len(prompt_after_image_id) > self.seq_length:
                             print("promt too long, jumped")
                             continue
                         prompt_answer_id =  prompt_before_image_id + prompt_after_image_id
-                        tgt_id = [PAD_ID] * (len(prompt_answer_id) + num_image_tokens - 1)
+                        tgt_id = [PAD_ID] * (len(prompt_answer_id) - 1)
                         tgt_seg_nums = [len(tgt_id)]
                     elif i % 2 == 0: # human
                         prompt = conv["value"]
@@ -1159,10 +1157,10 @@ class LlavaDataset(Dataset):
                 pad_num = self.seq_length - sum(tgt_seg_nums)
                 tgt_seg_nums = tgt_seg_nums + [pad_num]
 
-                if len(prompt_answer_id) > seq_text :
-                    prompt_answer_id = prompt_answer_id[:seq_text]
+                if len(prompt_answer_id) > self.seq_length :
+                    prompt_answer_id = prompt_answer_id[:self.seq_length]
 
-                pad_num = seq_text - len(prompt_answer_id)
+                pad_num = self.seq_length - len(prompt_answer_id)
                 prompt_answer_seg_nums = [len(prompt_answer_id), pad_num]
                 prompt_answer_id = prompt_answer_id + [PAD_ID] * pad_num
 

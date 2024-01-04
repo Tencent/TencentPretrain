@@ -96,7 +96,7 @@ def load_or_initialize_parameters(args, model):
         args.logger.info("unexpected_keys: {0}".format(keys_info.unexpected_keys))
         if args.vision_model_in_VL_emb_path is not None:
             args.logger.info("loading model from {0}".format(args.vision_model_in_VL_emb_path))   
-            model = load_model(model, args.vision_model_in_VL_emb_path, missing_prefix="embedding.vision_language.vision_")
+            model = load_model(model, args.vision_model_in_VL_emb_path)
     else:
         # Initialize with normal distribution.
         for n, p in list(model.named_parameters()):
@@ -112,8 +112,6 @@ if __name__ == '__main__':
     parser.add_argument("--top_k", type=int, default=70)
     parser.add_argument("--top_p", type=float, default=0)
     parser.add_argument("--temperature", type=float, default=1.0)
-    parser.add_argument("--vision_model_in_VL_emb_path", type=str, default=None,
-                        help="Path of the vision pretrained model in the vision language embedding.")
     parser.add_argument("--instruction_template", type=str, choices=["sys0", "sys1", "sys2", "sys3", "sys4"],
                         help="The instruction type for training large language-vision model.", default="sys0")
 
@@ -146,7 +144,7 @@ if __name__ == '__main__':
             if args.pretrained_model_path:
                 model = _load_state_dict_into_model(model, args.pretrained_model_path)
             if args.vision_model_in_VL_emb_path is not None:
-                model = _load_state_dict_into_model(model, args.vision_model_in_VL_emb_path, missing_prefix="embedding.vision_language.vision_")
+                model = _load_state_dict_into_model(model, args.vision_model_in_VL_emb_path)
     else:
         model = LLaVaGenerate(args)
         load_or_initialize_parameters(args, model)

@@ -546,6 +546,7 @@ class VisionDataloader(Dataloader):
         self.patch_size = args.patch_size
         self.image_height = args.image_height
         self.image_width = args.image_width
+        self.args = args
 
         from torchvision import transforms
         from tencentpretrain.utils.misc import ZeroOneNormalize
@@ -990,7 +991,9 @@ class LlavaDataloader(VisionDataloader):
         """
         from torchvision.io import read_image
         from torchvision.io.image import ImageReadMode
-        seg_num = (self.image_height // self.patch_size) * (self.image_width // self.patch_size) + 1
+
+        seg_image_num = (self.image_height // self.patch_size) * (self.image_width // self.patch_size)
+        text_seq_length = self.args.seq_length - seg_image_num
         while True:
             while self._empty():
                 self._fill_buf()
@@ -1013,14 +1016,17 @@ class LlavaDataloader(VisionDataloader):
                 ins_seg_nums_src, ins_seg_nums_tgt = ins[1]
                 ins_src_image, ins_image_pos = ins[2]
 
-                src_text.append(ins_src)
-                tgt.append(ins_tgt)
+                src_text.append(ins_src[:text_seq_length])
                 ins_seg_src = [1] * ins_seg_nums_src[0] + [0] * ins_seg_nums_src[1]
-                ins_seg_tgt = []
+                seg_text.append(ins_seg_src[:text_seq_length])
+
+                ins_tgt_new = [self.vocab.get(PAD_TOKEN)] * seg_image_num + ins_tgt
+                tgt.append(ins_tgt_new[:self.args.seq_length])
+                ins_seg_tgt = [0] * seg_image_num
                 for i, num in enumerate(ins_seg_nums_tgt):
                     ins_seg_tgt = ins_seg_tgt + [i % 2] * num
-                seg_text.append(ins_seg_src)
-                seg_tgt.append(ins_seg_tgt)
+                seg_tgt.append(ins_seg_tgt[:self.args.seq_length])
+
                 try:
                     image = read_image(ins_src_image, ImageReadMode.RGB)
                 except:
@@ -1028,7 +1034,7 @@ class LlavaDataloader(VisionDataloader):
                     continue
                 image = image.cuda(self.local_rank)
                 src_image.append(self.transform(image))
-                seg_image.append([1] * seg_num)
+                seg_image.append([1] * (seg_image_num + 1))
                 image_pos.append(ins_image_pos)
             if len(src_image) == 0:
                 continue 

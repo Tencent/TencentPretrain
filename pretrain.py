@@ -37,6 +37,8 @@ def main():
                         help="Number of prediction labels.")
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout value.")
     parser.add_argument("--seed", type=int, default=7, help="Random seed.")
+    parser.add_argument("--seq_length", type=int, default=128,
+                        help="Sequence length.")
 
     # Preprocess options.
     tokenizer_opts(parser)
@@ -44,8 +46,6 @@ def main():
 
     # Model options.
     model_opts(parser)
-    parser.add_argument("--vision_model_missing_prefix", type=str, required=False, default="embedding.vision_language.vision_",
-                        help="Extra prefix when loading the vision pretrained model as the embedding of the whole model.")
 
     # Model parallelism options.
     mp_opts(parser)

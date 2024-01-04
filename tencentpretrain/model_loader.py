@@ -1,32 +1,24 @@
 import os
 import torch
-import collections
 from tencentpretrain import mpu
 
 
-def load_model(model, model_path, lora_pretrained_model_path=None, missing_prefix=""):
+def load_model(model, model_path, lora_pretrained_model_path=None):
     """
     Load model from saved weights.
     """
-    state_dict = torch.load(model_path, map_location="cpu")
-    if missing_prefix != "":
-        state_dict_withprefix = collections.OrderedDict()
-        for k in state_dict.keys():
-            state_dict_withprefix[missing_prefix + k] = state_dict[k]
-        del state_dict
-        state_dict = state_dict_withprefix
     if hasattr(model, "module"):
-        model.module.load_state_dict(state_dict, strict=False)
+        model.module.load_state_dict(torch.load(model_path, map_location="cpu"), strict=False)
         if lora_pretrained_model_path is not None:
             model.module.load_state_dict(torch.load(lora_pretrained_model_path, map_location="cpu"), strict=False)
     else:
-        model.load_state_dict(state_dict, strict=False)
+        model.load_state_dict(torch.load(model_path, map_location="cpu"), strict=False)
         if lora_pretrained_model_path is not None:
             model.load_state_dict(torch.load(lora_pretrained_model_path, map_location="cpu"), strict=False)
     return model
 
 
-def _load_state_dict_into_model(model_to_load, model_path, start_prefix="", missing_prefix=""):
+def _load_state_dict_into_model(model_to_load, model_path, start_prefix=""):
     # Convert old format to new format if needed from a PyTorch state_dict
 
     # copy state_dict so _load_from_state_dict can modify it
@@ -61,12 +53,6 @@ def _load_state_dict_into_model(model_to_load, model_path, start_prefix="", miss
         for name, child in module._modules.items():
             if child is not None:
                 load(child, state_dict, prefix + name + ".")
-    if missing_prefix != "":
-        state_dict_withprefix = collections.OrderedDict()
-        for k in state_dict.keys():
-            state_dict_withprefix[missing_prefix + k] = state_dict[k]
-        del state_dict
-        state_dict = state_dict_withprefix
 
     load(model_to_load, state_dict, prefix=start_prefix)
     # Delete `state_dict` so it could be collected by GC earlier. Note that `state_dict` is a copy of the argument, so
