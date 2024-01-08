@@ -18,8 +18,6 @@ args = parser.parse_args()
 
 input_model = torch.load(args.input_model_path)
 
-input_model =
-
 output_model = collections.OrderedDict()
 
 
@@ -34,7 +32,7 @@ model_config = {"3B" : [26, 3200, 32],
 
 layers_num, dim, n_heads = model_config[args.type]
 
-if args.type == "70B":
+if args.gqa == "70B":
     dim2 = dim // 8
     kv_heads = 8
 else:
