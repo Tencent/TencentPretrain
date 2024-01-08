@@ -1,0 +1,7 @@
+{
+  "pad_token": "<|endoftext|>",
+  "unk_token": "<|endoftext|>",
+  "cls_token": "<|startoftext|>",
+  "sep_token": "<|endoftext|>",
+  "mask_token": "<|endoftext|>"
+}
