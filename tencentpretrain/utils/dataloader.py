@@ -556,7 +556,7 @@ class VisionDataloader(Dataloader):
             preprocess_pipeline.append(transforms.RandomResizedCrop(max(self.image_height, self.image_width)))
         elif "center_crop" in args.image_preprocess:
             preprocess_pipeline.append(transforms.Resize(min(self.image_height, self.image_width)))
-            preprocess_pipeline.append(transforms.CenterCrop((self.image_height, self.image_width)))
+            preprocess_pipeline.append(transforms.CenterCrop((self.image_height, self.image_width)))            
         if "horizontal_flip" in args.image_preprocess:
             preprocess_pipeline.append(transforms.RandomHorizontalFlip())
         preprocess_pipeline.append(transforms.Resize((self.image_height, self.image_width)))
@@ -564,6 +564,22 @@ class VisionDataloader(Dataloader):
         if "normalize" in args.image_preprocess:
             preprocess_pipeline.append(transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)))
         self.transform = transforms.Compose(preprocess_pipeline)
+
+    def expand2square(self, img, background_color=(122, 116, 104)):
+        from PIL import Image
+        width, height = img.size
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        if width == height:
+            return img
+        elif width > height:
+            result = Image.new(img.mode, (width, width), background_color)
+            result.paste(img, (0, (width - height) // 2))
+            return result
+        else:
+            result = Image.new(img.mode, (height, height), background_color)
+            result.paste(img, ((height - width) // 2, 0))
+            return result
 
 
 class VitDataloader(VisionDataloader):
@@ -1011,10 +1027,29 @@ class LlavaDataloader(VisionDataloader):
             seg_image = []
             seg_tgt = []
             image_pos = []
+
             for ins in instances:
                 ins_src, ins_tgt = ins[0]
                 ins_seg_nums_src, ins_seg_nums_tgt = ins[1]
                 ins_src_image, ins_image_pos = ins[2]
+
+                try:
+                    if "pad" in self.args.image_preprocess:
+                        from PIL import Image
+                        import numpy as np
+                        import torchvision.transforms.functional as transform
+                        image = Image.open(ins_src_image)
+                        image = self.expand2square(image)
+                        image = torch.from_numpy((np.array(image).transpose(2,0,1)))
+                    else:
+                        image = read_image(ins_src_image, ImageReadMode.RGB)
+                except:
+                    print("Something is wrong when reading {}, just skipped!".format(ins_src_image))
+                    continue
+                image = image.cuda(self.local_rank)
+                src_image.append(self.transform(image))
+                seg_image.append([1] * (seg_image_num + 1))
+                image_pos.append(ins_image_pos)
 
                 src_text.append(ins_src[:text_seq_length])
                 ins_seg_src = [1] * ins_seg_nums_src[0] + [0] * ins_seg_nums_src[1]
@@ -1027,15 +1062,6 @@ class LlavaDataloader(VisionDataloader):
                     ins_seg_tgt = ins_seg_tgt + [i % 2] * num
                 seg_tgt.append(ins_seg_tgt[:self.args.seq_length])
 
-                try:
-                    image = read_image(ins_src_image, ImageReadMode.RGB)
-                except:
-                    print("Something is wrong when reading {}, just skipped!".format(ins_src_image))
-                    continue
-                image = image.cuda(self.local_rank)
-                src_image.append(self.transform(image))
-                seg_image.append([1] * (seg_image_num + 1))
-                image_pos.append(ins_image_pos)
             if len(src_image) == 0:
                 continue 
             yield  torch.LongTensor(src_text), \

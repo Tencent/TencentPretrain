@@ -104,6 +104,22 @@ def load_or_initialize_parameters(args, model):
                 p.data.normal_(0, 0.02)
 
 
+def expand2square(img, background_color=(122, 116, 104)):
+    from PIL import Image
+    width, height = img.size
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    if width == height:
+        return img
+    elif width > height:
+        result = Image.new(img.mode, (width, width), background_color)
+        result.paste(img, (0, (width - height) // 2))
+        return result
+    else:
+        result = Image.new(img.mode, (height, height), background_color)
+        result.paste(img, ((height - width) // 2, 0))
+        return result
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -114,7 +130,8 @@ if __name__ == '__main__':
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--instruction_template", type=str, choices=["sys0", "sys1", "sys2", "sys3", "sys4"],
                         help="The instruction type for training large language-vision model.", default="sys0")
-
+    parser.add_argument("--vision_model_in_VL_emb_path", type=str, default=None,
+                        help="Path of the vision pretrained model in the vision language embedding.")
     tokenizer_opts(parser)
 
     deepspeed_opts(parser)
@@ -122,6 +139,8 @@ if __name__ == '__main__':
     log_opts(parser)
 
     mp_opts(parser)
+
+    vision_opts(parser)
 
     args = parser.parse_args()
 
@@ -160,12 +179,20 @@ if __name__ == '__main__':
     image_width = args.vision_language_emb["vision_encoder"]["image_width"]
     patch_size = args.vision_language_emb["vision_encoder"]["patch_size"]
 
-    transform = transforms.Compose([
-        transforms.Resize(min(image_height, image_width)),
-        transforms.CenterCrop((image_height, image_width)),
-        ZeroOneNormalize(),
-        transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
-    ])
+    preprocess_pipeline = []
+    if "corp" in args.image_preprocess:
+        preprocess_pipeline.append(transforms.RandomResizedCrop(max(image_height, image_width)))
+    elif "center_crop" in args.image_preprocess:
+        preprocess_pipeline.append(transforms.Resize(min(image_height, image_width)))
+        preprocess_pipeline.append(transforms.CenterCrop((image_height, image_width)))            
+    if "horizontal_flip" in args.image_preprocess:
+        preprocess_pipeline.append(transforms.RandomHorizontalFlip())
+    preprocess_pipeline.append(transforms.Resize((image_height, image_width)))
+    preprocess_pipeline.append(ZeroOneNormalize())
+    if "normalize" in args.image_preprocess:
+        preprocess_pipeline.append(transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)))
+    transform = transforms.Compose(preprocess_pipeline)
+
     prompt_template = {
         "sys0": "",
         "sys1": "<<SYS>>\nYou are a helpful language and vision assistant. You are able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.\n<</SYS>>\n\n",
@@ -177,7 +204,7 @@ if __name__ == '__main__':
     im_start, im_end = "<Image>", "</Image>"
     num_image_tokens = int(image_width / patch_size) * int(image_height / patch_size) + 1 # 336/14-14 --> 576 dim + 1
     seq_text = args.seq_length - num_image_tokens
-    outf = open(args.prediction_path, mode="w", encoding="utf-8")
+    outf = open(args.prediction_path, mode="a", encoding="utf-8")
     input_f = open(args.test_path, mode="r", encoding="utf-8")
     datas = json.load(input_f)
     try:
@@ -193,7 +220,16 @@ if __name__ == '__main__':
                 continue
             if imghdr.what(image_path) != 'jpeg' and imghdr.what(image_path) != 'png':
                 continue
-            image = read_image(image_path, ImageReadMode.RGB)
+            if "pad" in args.image_preprocess:
+                from PIL import Image
+                import numpy as np
+                import torchvision.transforms.functional as transform
+                image = Image.open(image_path)
+                image = expand2square(image)
+                image = torch.from_numpy((np.array(image).transpose(2,0,1)))
+            else:
+                image = read_image(image_path, ImageReadMode.RGB)
+
             image = image.to(device)
             src_image = transform(image)
         except:
@@ -299,4 +335,4 @@ if __name__ == '__main__':
                 generated_sentence = "".join(args.tokenizer.convert_ids_to_tokens(tokens))
             print(item)
             print(generated_sentence)
-            print(generated_sentence+ "\n\n", file=outf)
+            print(generated_sentence + "\n\n", file=outf)
