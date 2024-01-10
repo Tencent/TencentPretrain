@@ -36,8 +36,6 @@ from .utils import divide
 from .utils import split_tensor_along_last_dim
 from .utils import VocabUtility
 #from megatron import get_args
-import deepspeed.runtime.activation_checkpointing.checkpointing as ds_checkpointing
-
 
 _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS = {
     "tensor_model_parallel": False,
@@ -83,6 +81,7 @@ def copy_tensor_model_parallel_attributes(destination_tensor, source_tensor):
 def _initialize_affine_weight_gpu(weight, init_method, partition_dim, stride=1):
     """Initialize affine weight for model parallel on GPU."""
 
+    import deepspeed.runtime.activation_checkpointing.checkpointing as ds_checkpointing
     set_tensor_model_parallel_attributes(
         tensor=weight, is_parallel=True, dim=partition_dim, stride=stride
     )
