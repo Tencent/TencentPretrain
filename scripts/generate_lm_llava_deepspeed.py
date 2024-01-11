@@ -124,8 +124,6 @@ if __name__ == '__main__':
 
     mp_opts(parser)
 
-    vision_opts(parser)
-
     args = parser.parse_args()
 
     args.target = "lm"
@@ -188,7 +186,6 @@ if __name__ == '__main__':
     im_start, im_end = "<Image>", "</Image>"
     num_image_tokens = int(image_width / patch_size) * int(image_height / patch_size) + 1 # 336/14-14 --> 576 dim + 1
     seq_text = args.seq_length - num_image_tokens
-    outf = open(args.prediction_path, mode="a", encoding="utf-8")
     input_f = open(args.test_path, mode="r", encoding="utf-8")
     datas = json.load(input_f)
     try:
@@ -196,127 +193,128 @@ if __name__ == '__main__':
     except:
         args.logger.info("unsupported prompt template!")
         NotImplementedError
-    for line_id, item in enumerate(datas):
-        try:
-            id = item["id"]
-            image_path = "datasets/llava/" + item["image"]
-            if not os.path.isfile(image_path):
-                continue
-            if imghdr.what(image_path) != 'jpeg' and imghdr.what(image_path) != 'png':
-                continue
-            if "pad" in args.image_preprocess:
-                from PIL import Image
-                import numpy as np
-                import torchvision.transforms.functional as transform
-                image = Image.open(image_path)
-                image = expand2square(image)
-                image = torch.from_numpy((np.array(image).transpose(2,0,1)))
-            else:
-                image = read_image(image_path, ImageReadMode.RGB)
-
-            image = image.to(device)
-            src_image = transform(image)
-        except:
-            print("sth wrong with item{}".format(item))
-            continue
-
-        prompt_before_image = prompt_overall + " " + role1 + ": "
-        ground_truth = []
-        prompt_answer_id = []
-        if "conversations" in item:
-            conversations = item["conversations"]
-            for i, conv in enumerate(conversations):
-                # 1 round
-                if i > 1:
+    with open(args.prediction_path, mode="a", encoding="utf-8") as outf:
+        for line_id, item in enumerate(datas):
+            try:
+                id = item["id"]
+                image_path = "datasets/llava/" + item["image"]
+                if not os.path.isfile(image_path):
                     continue
-                if i == 0:
-                    prompt = conv["value"]
-                    if prompt.endswith("<image>"):
-                        prompt_before_image = prompt_before_image + prompt.replace("<image>", im_start)
-                        prompt_after_image = im_end + "\n" + role2 + ": "
-                    elif prompt.startswith("<image>"):
-                        prompt_before_image = prompt_before_image + im_start
-                        prompt_after_image = prompt.replace("<image>", im_end) + "\n" + role2 + ": "
-                    else:
-                        prompt_before_image = prompt_before_image + im_start
-                        prompt_after_image = im_end + "\n" + prompt + " " + role2 + ": "
+                if imghdr.what(image_path) != 'jpeg' and imghdr.what(image_path) != 'png':
+                    continue
+                if "pad" in args.image_preprocess:
+                    from PIL import Image
+                    import numpy as np
+                    import torchvision.transforms.functional as transform
+                    image = Image.open(image_path)
+                    image = expand2square(image)
+                    image = torch.from_numpy((np.array(image).transpose(2,0,1)))
+                else:
+                    image = read_image(image_path, ImageReadMode.RGB)
 
-                    prompt_before_image_id = args.tokenizer.convert_tokens_to_ids(
-                        args.tokenizer.tokenize(prompt_before_image)
-                    )
-                    prompt_after_image_id = args.tokenizer.convert_tokens_to_ids(
-                        args.tokenizer.tokenize(prompt_after_image)
-                    )
-                    seg_before_image = [1] * len(prompt_before_image_id)
-                    seg_after_image = [1] * len(prompt_after_image_id)
-                    if len(prompt_before_image_id) + len(prompt_after_image_id) > seq_text:
-                        args.logger.info("promt too long, jump for now")
-                        break
-                    prompt_answer_id = [prompt_before_image_id + prompt_after_image_id]
-                    prompt_answer_seg = [seg_before_image + seg_after_image]
-                elif i % 2 == 0: # human
-                    prompt = conv["value"]
-                    prompt_id = args.tokenizer.convert_tokens_to_ids(
-                        args.tokenizer.tokenize(role1 + ": " + prompt + " " + role2 + ": ")
-                    )
-                    if prompt_answer_id:
-                        prompt_answer_id.append(prompt_id)
-                        prompt_answer_seg.append(prompt_answer_seg + [1] * len(prompt_id))
-                    else:
-                        args.logger.info("no prompt, or prompt too long, jumping")
-                        break
-                else: # gpt
-                    ground_truth.append(conv["value"])
-        else:
-            prompt = item["instruction"]
-            prompt_before_image = prompt_before_image + im_start
-            prompt_after_image = im_end + "\n" + prompt + "\n" + role2 + ": "
-            prompt_before_image_id = args.tokenizer.convert_tokens_to_ids(
-                args.tokenizer.tokenize(prompt_before_image)
-            )
-            prompt_after_image_id = args.tokenizer.convert_tokens_to_ids(
-                args.tokenizer.tokenize(prompt_after_image)
-            )
-            seg_before_image = [1] * len(prompt_before_image_id)
-            seg_after_image = [1] * len(prompt_after_image_id)
-            if len(prompt_before_image_id) + len(prompt_after_image_id) > seq_text:
-                args.logger.info("promt too long, jump for now")
-                break
-            prompt_answer_id = [prompt_before_image_id + prompt_after_image_id]
-            prompt_answer_seg = [seg_before_image + seg_after_image]
+                image = image.to(device)
+                src_image = transform(image)
+            except:
+                print("sth wrong with item{}".format(item))
+                continue
 
-        image_pos = len(prompt_before_image_id)
-        
-        image_tensor = torch.unsqueeze(src_image, 0).half()
-        image_seg_tensor = torch.ones(1, num_image_tokens).to(device)
-        image_pos = torch.LongTensor([image_pos]).to(device)
-        SEP_ID = args.tokenizer.convert_tokens_to_ids([SEP_TOKEN])
-        text_tensor = None
+            prompt_before_image = prompt_overall + " " + role1 + ": "
+            ground_truth = []
+            prompt_answer_id = []
+            if "conversations" in item:
+                conversations = item["conversations"]
+                for i, conv in enumerate(conversations):
+                    # 1 round
+                    if i > 1:
+                        continue
+                    if i == 0:
+                        prompt = conv["value"]
+                        if prompt.endswith("<image>"):
+                            prompt_before_image = prompt_before_image + prompt.replace("<image>", im_start)
+                            prompt_after_image = im_end + "\n" + role2 + ": "
+                        elif prompt.startswith("<image>"):
+                            prompt_before_image = prompt_before_image + im_start
+                            prompt_after_image = prompt.replace("<image>", im_end) + "\n" + role2 + ": "
+                        else:
+                            prompt_before_image = prompt_before_image + im_start
+                            prompt_after_image = im_end + "\n" + prompt + " " + role2 + ": "
 
-        for i, prompt in enumerate(prompt_answer_id):
-            if text_tensor is None:
-                text_tensor, text_seg_tensor = torch.LongTensor([prompt]).to(device), torch.LongTensor([prompt_answer_seg[i]]).to(device)
+                        prompt_before_image_id = args.tokenizer.convert_tokens_to_ids(
+                            args.tokenizer.tokenize(prompt_before_image)
+                        )
+                        prompt_after_image_id = args.tokenizer.convert_tokens_to_ids(
+                            args.tokenizer.tokenize(prompt_after_image)
+                        )
+                        seg_before_image = [1] * len(prompt_before_image_id)
+                        seg_after_image = [1] * len(prompt_after_image_id)
+                        if len(prompt_before_image_id) + len(prompt_after_image_id) > seq_text:
+                            args.logger.info("promt too long, jump for now")
+                            break
+                        prompt_answer_id = [prompt_before_image_id + prompt_after_image_id]
+                        prompt_answer_seg = [seg_before_image + seg_after_image]
+                    elif i % 2 == 0: # human
+                        prompt = conv["value"]
+                        prompt_id = args.tokenizer.convert_tokens_to_ids(
+                            args.tokenizer.tokenize(role1 + ": " + prompt + " " + role2 + ": ")
+                        )
+                        if prompt_answer_id:
+                            prompt_answer_id.append(prompt_id)
+                            prompt_answer_seg.append(prompt_answer_seg + [1] * len(prompt_id))
+                        else:
+                            args.logger.info("no prompt, or prompt too long, jumping")
+                            break
+                    else: # gpt
+                        ground_truth.append(conv["value"])
             else:
-                text_tensor = torch.cat([text_tensor, torch.LongTensor([prompt]).to(device)], dim=1)
-                text_seg_tensor = torch.cat([text_seg_tensor, torch.LongTensor([prompt_answer_seg[i]]).to(device)], dim=1)
-
-            while text_tensor.shape[1] + num_image_tokens <= args.seq_length:
-                output = model(text_tensor, text_seg_tensor, image_tensor, image_seg_tensor, image_pos)
-                next_token_logits = output[0][-1] / args.temperature
-                filtered_logits = top_k_top_p_filtering(next_token_logits, args.top_k, args.top_p)
-                next_token = torch.multinomial(F.softmax(filtered_logits, dim=-1), num_samples=1)
-
-                text_tensor = torch.cat([text_tensor, next_token.view(1, 1)], dim=1)
-                text_seg_tensor = torch.cat([text_seg_tensor, torch.tensor([[1]]).to(device)], dim=1)
-                if next_token.cpu().tolist() == SEP_ID:
+                prompt = item["instruction"]
+                prompt_before_image = prompt_before_image + im_start
+                prompt_after_image = im_end + "\n" + prompt + "\n" + role2 + ": "
+                prompt_before_image_id = args.tokenizer.convert_tokens_to_ids(
+                    args.tokenizer.tokenize(prompt_before_image)
+                )
+                prompt_after_image_id = args.tokenizer.convert_tokens_to_ids(
+                    args.tokenizer.tokenize(prompt_after_image)
+                )
+                seg_before_image = [1] * len(prompt_before_image_id)
+                seg_after_image = [1] * len(prompt_after_image_id)
+                if len(prompt_before_image_id) + len(prompt_after_image_id) > seq_text:
+                    args.logger.info("promt too long, jump for now")
                     break
+                prompt_answer_id = [prompt_before_image_id + prompt_after_image_id]
+                prompt_answer_seg = [seg_before_image + seg_after_image]
 
-        if rank == 0 and text_tensor is not None:
-            tokens = [token_id.item() for token_id in text_tensor[0]]
-            if args.tokenizer.sp_model is not None:
-                generated_sentence = args.tokenizer.sp_model.decode(tokens)
-            else:
-                generated_sentence = "".join(args.tokenizer.convert_ids_to_tokens(tokens))
-            print(item)
-            print(generated_sentence)
-            print(generated_sentence + "\n\n", file=outf)
+            image_pos = len(prompt_before_image_id)
+            
+            image_tensor = torch.unsqueeze(src_image, 0).half()
+            image_seg_tensor = torch.ones(1, num_image_tokens).to(device)
+            image_pos = torch.LongTensor([image_pos]).to(device)
+            SEP_ID = args.tokenizer.convert_tokens_to_ids([SEP_TOKEN])
+            text_tensor = None
+            for i, prompt in enumerate(prompt_answer_id):
+                if text_tensor is None:
+                    text_tensor, text_seg_tensor = torch.LongTensor([prompt]).to(device), torch.LongTensor([prompt_answer_seg[i]]).to(device)
+                else:
+                    text_tensor = torch.cat([text_tensor, torch.LongTensor([prompt]).to(device)], dim=1)
+                    text_seg_tensor = torch.cat([text_seg_tensor, torch.LongTensor([prompt_answer_seg[i]]).to(device)], dim=1)
+
+                while text_tensor.shape[1] + num_image_tokens <= args.seq_length:
+                    output = model(text_tensor, text_seg_tensor, image_tensor, image_seg_tensor, image_pos)
+                    next_token_logits = output[0][-1] / args.temperature
+                    filtered_logits = top_k_top_p_filtering(next_token_logits, args.top_k, args.top_p)
+                    next_token = torch.multinomial(F.softmax(filtered_logits, dim=-1), num_samples=1)
+
+                    text_tensor = torch.cat([text_tensor, next_token.view(1, 1)], dim=1)
+                    text_seg_tensor = torch.cat([text_seg_tensor, torch.tensor([[1]]).to(device)], dim=1)
+                    if next_token.cpu().tolist() == SEP_ID:
+                        break
+            if rank == 0 and text_tensor is not None:
+                tokens = [token_id.item() for token_id in text_tensor[0]]
+                if args.tokenizer.sp_model is not None:
+                    generated_sentence = args.tokenizer.sp_model.decode(tokens)
+                else:
+                    generated_sentence = "".join(args.tokenizer.convert_ids_to_tokens(tokens))
+                print(item)
+                print(generated_sentence)
+                print(item + "\n", file=outf)
+                print(generated_sentence + "\n\n", file=outf)
+
