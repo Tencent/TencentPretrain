@@ -28,7 +28,7 @@ from tencentpretrain.opts import infer_opts, tokenizer_opts, log_opts, mp_opts
 from tencentpretrain.opts import deepspeed_opts
 from tencentpretrain.utils.logging import init_logger
 from tencentpretrain.model_loader import _load_state_dict_into_model, load_model
-from tencentpretrain.utils.misc import pooling, ZeroOneNormalize
+from tencentpretrain.utils.misc import pooling, ZeroOneNormalize, expand2square
 
 
 class LLaVaGenerate(nn.Module):
@@ -103,22 +103,6 @@ def load_or_initialize_parameters(args, model):
             if "gamma" not in n and "beta" not in n:
                 p.data.normal_(0, 0.02)
 
-
-def expand2square(img, background_color=(122, 116, 104)):
-    from PIL import Image
-    width, height = img.size
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-    if width == height:
-        return img
-    elif width > height:
-        result = Image.new(img.mode, (width, width), background_color)
-        result.paste(img, (0, (width - height) // 2))
-        return result
-    else:
-        result = Image.new(img.mode, (height, height), background_color)
-        result.paste(img, ((height - width) // 2, 0))
-        return result
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
