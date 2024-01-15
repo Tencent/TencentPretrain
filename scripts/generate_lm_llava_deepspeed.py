@@ -315,6 +315,6 @@ if __name__ == '__main__':
                     generated_sentence = "".join(args.tokenizer.convert_ids_to_tokens(tokens))
                 print(item)
                 print(generated_sentence)
-                print(item + "\n", file=outf)
+                print("\t".join(item.values()) + "\n", file=outf)
                 print(generated_sentence + "\n\n", file=outf)
 
