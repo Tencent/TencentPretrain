@@ -13,6 +13,8 @@ def main():
                         help="Path of the preprocessed dataset.")
     parser.add_argument("--pretrained_model_path", type=str, default=None,
                         help="Path of the pretrained model.")
+    parser.add_argument("--vision_model_in_VL_emb_path", type=str, default=None,
+                        help="Path of the vision pretrained model in the vision language embedding.")
     parser.add_argument("--output_model_path", type=str, required=True,
                         help="Path of the output model.")
     parser.add_argument("--config_path", type=str, default="models/bert/base_config.json",
@@ -35,6 +37,8 @@ def main():
                         help="Number of prediction labels.")
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout value.")
     parser.add_argument("--seed", type=int, default=7, help="Random seed.")
+    parser.add_argument("--seq_length", type=int, default=128,
+                        help="Sequence length.")
 
     # Preprocess options.
     tokenizer_opts(parser)

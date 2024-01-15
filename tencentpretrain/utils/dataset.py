@@ -57,6 +57,7 @@ class Dataset(object):
         self.span_max_length = args.span_max_length
         self.docs_buffer_size = args.docs_buffer_size
         self.dup_factor = args.dup_factor
+        self.args = args
 
     def build_and_save(self, workers_num):
         """
@@ -1079,6 +1080,96 @@ class LlmSftDataset(Dataset):
                     pad_num = self.seq_length - len(src)
 
                 pickle.dump(((src, pad_num), seg_pos), dataset_writer)
+                if pos >= end:
+                    break
+
+        dataset_writer.close()
+
+
+class LlavaDataset(Dataset):
+    def worker(self, proc_id, start, end):
+        import json
+        PAD_ID = self.tokenizer.convert_tokens_to_ids([PAD_TOKEN])[0]
+        role1, role2 = "USER", "ASSISTANT"
+        im_start, im_end = "<Image>", "</Image>"
+        print("Worker %d is building dataset ... " % proc_id)
+        set_seed(self.seed)
+        dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
+        pos = start
+        skip_item = 0
+        with open(self.corpus_path, mode="r", encoding="utf-8") as f:
+            data = json.load(f)
+            while True:
+                item = data[pos]
+                pos += 1
+                try:
+                    path = item["image"]
+                    if not os.path.isfile(path):
+                        continue
+                except:
+                    skip_item += 1
+                    continue
+                conversations = item["conversations"]
+
+                prompt_before_image = role1 + ": "
+                prompt_answer_seg_nums, tgt_seg_nums = [], []
+                for i, conv in enumerate(conversations):
+                    if i == 0:
+                        prompt = conv["value"]
+                        if prompt.endswith("<image>"):
+                            prompt_before_image = prompt_before_image + prompt.replace("<image>", im_start)
+                            prompt_after_image = im_end + "\n" + role2 + ": "
+                        elif prompt.startswith("<image>"):
+                            prompt_before_image = prompt_before_image + im_start
+                            prompt_after_image = prompt.replace("<image>", im_end) + "\n" + role2 + ": "
+                        prompt_before_image_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(prompt_before_image))
+                        prompt_after_image_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(prompt_after_image))
+                        seg_before_image = [1] * len(prompt_before_image_id)
+                        seg_after_image = [1] * len(prompt_after_image_id)
+                        if len(prompt_before_image_id) + len(prompt_after_image_id) > self.seq_length:
+                            print("promt too long, jumped")
+                            continue
+                        prompt_answer_id =  prompt_before_image_id + prompt_after_image_id
+                        tgt_id = [PAD_ID] * (len(prompt_answer_id) - 1)
+                        tgt_seg_nums = [len(tgt_id)]
+                    elif i % 2 == 0: # human
+                        prompt = conv["value"]
+                        prompt_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(role1 + ": " + prompt + "\n" + role2 + ": "))
+                        prompt_answer_id = prompt_answer_id + prompt_id
+                        tgt_id = tgt_id + [PAD_ID] * len(prompt_id)
+                        if len(tgt_seg_nums) == 1:
+                            tgt_seg_nums[0] = tgt_seg_nums[0] + len(prompt_id)
+                        else:
+                            tgt_seg_nums = tgt_seg_nums + [len(prompt_id)]
+                    else: # gpt
+                        answer = conv["value"]
+                        answer_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(answer) + [SEP_TOKEN])
+                        prompt_answer_id = prompt_answer_id + answer_id
+                        tgt_id = tgt_id + answer_id
+                        tgt_seg_nums = tgt_seg_nums + [len(answer_id)]
+
+                if len(tgt_id) > self.seq_length:
+                    tgt_id = tgt_id[:self.seq_length]
+                pad_num = self.seq_length - len(tgt_id)
+                tgt_id = tgt_id + [PAD_ID] * pad_num
+                while sum(tgt_seg_nums) > self.seq_length:
+                    tgt_seg_nums = tgt_seg_nums[:-1]
+                pad_num = self.seq_length - sum(tgt_seg_nums)
+                tgt_seg_nums = tgt_seg_nums + [pad_num]
+
+                if len(prompt_answer_id) > self.seq_length :
+                    prompt_answer_id = prompt_answer_id[:self.seq_length]
+
+                pad_num = self.seq_length - len(prompt_answer_id)
+                prompt_answer_seg_nums = [len(prompt_answer_id), pad_num]
+                prompt_answer_id = prompt_answer_id + [PAD_ID] * pad_num
+
+                image_pos = len(prompt_before_image_id)
+                src = (prompt_answer_id, tgt_id)
+                seg_nums = (prompt_answer_seg_nums, tgt_seg_nums)
+                image = (path, image_pos)
+                pickle.dump((src, seg_nums, image), dataset_writer)
+
                 if pos >= end:
                     break
 

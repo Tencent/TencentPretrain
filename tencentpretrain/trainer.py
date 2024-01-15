@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel
@@ -93,6 +94,9 @@ def init_model(args):
     else:
         model_for_dataloader = None
 
+    if args.vision_model_in_VL_emb_path is not None:
+        args.logger.info("loading: {}".format(args.vision_model_in_VL_emb_path))
+        model_for_training = _load_state_dict_into_model(model_for_training, args.vision_model_in_VL_emb_path)
     return model_for_training, model_for_dataloader
     
 
@@ -649,12 +653,23 @@ class LlmSftTrainer(LmTrainer):
     pass
 
 
+class LlavaTrainer(LmTrainer):
+    def forward_propagation(self, batch, model):
+        src_text, src_img, tgt, seg_text, seg_img, seg_tgt, image_pos = batch
+        seg = torch.cat((seg_img[:,1:], seg_text), 1)
+        loss = model((src_text, src_img, seg_text, seg_img, image_pos), tgt, seg, tgt_seg=seg_tgt)
+
+        self.total_loss += loss.item()
+        loss = loss / self.accumulation_steps
+        return loss
+
+
 str2trainer = {"bert": BertTrainer, "mlm": MlmTrainer, "lm": LmTrainer,
                "albert": AlbertTrainer, "bilm": BilmTrainer, "cls": ClsTrainer,
                "mt": MtTrainer, "t5": T5Trainer, "gsg": GsgTrainer,
                "bart": BartTrainer, "prefixlm": PrefixlmTrainer, "cls_mlm": ClsMlmTrainer,
                "vit": VitTrainer, "vilt": ViltTrainer, "clip": ClipTrainer, "s2t": S2tTrainer,
-               "beit": BeitTrainer, "dalle": DalleTrainer, "llm_sft": LlmSftTrainer}
+               "beit": BeitTrainer, "dalle": DalleTrainer, "llm_sft": LlmSftTrainer, "llava": LlavaTrainer}
 
 
 def worker(local_rank, gpu_ranks, args):
@@ -675,6 +690,9 @@ def worker(local_rank, gpu_ranks, args):
 
     # Build model.
     model_for_training, model_for_dataloader = init_model(args)
+
+    if global_rank == 0:
+        args.logger.info("model: {}".format(model_for_training))
 
     # Build optimizer.
     custom_optimizer, custom_scheduler, optimizer_grouped_parameters = init_optimizer(args, model_for_training)

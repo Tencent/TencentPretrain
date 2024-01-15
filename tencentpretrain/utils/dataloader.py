@@ -546,6 +546,7 @@ class VisionDataloader(Dataloader):
         self.patch_size = args.patch_size
         self.image_height = args.image_height
         self.image_width = args.image_width
+        self.args = args
 
         from torchvision import transforms
         from tencentpretrain.utils.misc import ZeroOneNormalize
@@ -553,6 +554,9 @@ class VisionDataloader(Dataloader):
         preprocess_pipeline = []
         if "corp" in args.image_preprocess:
             preprocess_pipeline.append(transforms.RandomResizedCrop(max(self.image_height, self.image_width)))
+        elif "center_crop" in args.image_preprocess:
+            preprocess_pipeline.append(transforms.Resize(min(self.image_height, self.image_width)))
+            preprocess_pipeline.append(transforms.CenterCrop((self.image_height, self.image_width)))            
         if "horizontal_flip" in args.image_preprocess:
             preprocess_pipeline.append(transforms.RandomHorizontalFlip())
         preprocess_pipeline.append(transforms.Resize((self.image_height, self.image_width)))
@@ -963,3 +967,93 @@ class LlmSftDataloader(Dataloader):
             yield torch.LongTensor(src), \
                   torch.LongTensor(tgt), \
                   torch.LongTensor(seg)
+
+
+class LlavaDataloader(VisionDataloader):
+
+    def __iter__(self):
+        """
+        instances: ((src, tgt), (seg_src, seg_tgt), (src_image, image_pos))
+            src, tgt: Tokens of the text sample
+            seg_src_nums, seg_tgt_nums: Number of the segment information of text sample
+            src_image: Path of the image sample
+            image_pos: Position of the image in the text sample
+
+        Returns:
+            src_text: [batch_size x seq_length]
+            src_image: [batch_size x channel_size x width x hight]
+            tgt: [batch_size x seq_length]
+            seg_text: [batch_size x seq_length]
+            seg_image: [batch_size x (patch_num + 1)]
+            seg_tgt: [batch_size x seq_length]
+            image_pos: [batch_size]
+
+        """
+        from torchvision.io import read_image
+        from torchvision.io.image import ImageReadMode
+        from tencentpretrain.utils.misc import expand2square
+
+        seg_image_num = (self.image_height // self.patch_size) * (self.image_width // self.patch_size)
+        while True:
+            while self._empty():
+                self._fill_buf()
+            if self.start + self.batch_size >= self.end:
+                instances = self.buffer[self.start:]
+            else:
+                instances = self.buffer[self.start: self.start + self.batch_size]
+
+            self.start += self.batch_size
+
+            src_text = []
+            src_image = []
+            tgt = []
+            seg_text = []
+            seg_image = []
+            seg_tgt = []
+            image_pos = []
+
+            for ins in instances:
+                ins_src, ins_tgt = ins[0]
+                ins_seg_nums_src, ins_seg_nums_tgt = ins[1]
+                ins_src_image, ins_image_pos = ins[2]
+                seq_length = len(ins_src)
+                text_seq_length = seq_length - seg_image_num
+
+                try:
+                    if "pad" in self.args.image_preprocess:
+                        from PIL import Image
+                        import numpy as np
+                        import torchvision.transforms.functional as transform
+                        image = Image.open(ins_src_image)
+                        image = expand2square(image)
+                        image = torch.from_numpy((np.array(image).transpose(2,0,1)))
+                    else:
+                        image = read_image(ins_src_image, ImageReadMode.RGB)
+                except:
+                    print("Something is wrong when reading {}, just skipped!".format(ins_src_image))
+                    continue
+                image = image.cuda(self.local_rank)
+                src_image.append(self.transform(image))
+                seg_image.append([1] * (seg_image_num + 1))
+                image_pos.append(ins_image_pos)
+
+                src_text.append(ins_src[:text_seq_length])
+                ins_seg_src = [1] * ins_seg_nums_src[0] + [0] * ins_seg_nums_src[1]
+                seg_text.append(ins_seg_src[:text_seq_length])
+
+                ins_tgt_new = [self.vocab.get(PAD_TOKEN)] * seg_image_num + ins_tgt
+                tgt.append(ins_tgt_new[:seq_length])
+                ins_seg_tgt = [0] * seg_image_num
+                for i, num in enumerate(ins_seg_nums_tgt):
+                    ins_seg_tgt = ins_seg_tgt + [i % 2] * num
+                seg_tgt.append(ins_seg_tgt[:seq_length])
+
+            if len(src_image) == 0:
+                continue 
+            yield  torch.LongTensor(src_text), \
+                   torch.stack(src_image, 0).half(), \
+                   torch.LongTensor(tgt), \
+                   torch.LongTensor(seg_text), \
+                   torch.LongTensor(seg_image), \
+                   torch.LongTensor(seg_tgt), \
+                   image_pos

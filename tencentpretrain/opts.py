@@ -52,7 +52,10 @@ def model_opts(parser):
                         help="whether use alibi position embedding.")
     parser.add_argument("--layer_number_scale", action="store_true",
                         help="whether use layer number scaling.")
-
+    parser.add_argument("--freeze_parameters", choices=["embedding", "encoder", "tgt_embedding", "decoder", "target"],
+                        default="", nargs='+', help="Which module to be frozen during training.")
+    parser.add_argument("--freeze_exclude_by_name", type=str, default="",
+                        help="Exclude some modules with the specific string in the name when freezing parameters.")
     vision_opts(parser)
     audio_opts(parser)
 
@@ -67,7 +70,7 @@ def vision_opts(parser):
     parser.add_argument("--channels_num", type=int, default=3,
                         help="Channels num.")
     parser.add_argument("--image_preprocess", type=str, default=["crop", "normalize"], nargs='+',
-                        help="Preprocess and data augmentation methods. Choices: [\"crop\", \"horizontal_flip\", \"normalize\"]. ")
+                        help="Preprocess and data augmentation methods. Choices: [\"crop\" or \"center_crop\" or \"pad\", \"horizontal_flip\", \"normalize\"]. ")
 
 
 def audio_opts(parser):

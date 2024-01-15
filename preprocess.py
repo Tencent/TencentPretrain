@@ -28,12 +28,14 @@ def main():
     parser.add_argument("--data_processor",
                         choices=["bert", "lm", "mlm", "bilm", "albert", "mt", "t5", "cls", "prefixlm",
                                  "gsg", "bart", "cls_mlm", "vit", "vilt", "clip", "s2t", "beit", "dalle",
-                                 "llm_pretrain", "llm_sft"], default="bert",
+                                 "llm_pretrain", "llm_sft", "llava"], default="bert",
                         help="The data processor of the pretraining model.")
     parser.add_argument("--docs_buffer_size", type=int, default=100000,
                         help="The buffer size of documents in memory, specific to targets that require negative sampling.")
     parser.add_argument("--seq_length", type=int, default=128, help="Sequence length of instances.")
     parser.add_argument("--tgt_seq_length", type=int, default=128, help="Target sequence length of instances.")
+    parser.add_argument("--vision_seq_length_in_VL", type=int, default=576, 
+                        help="Number of image patches in the vision language model(LLaVa).")
     parser.add_argument("--dup_factor", type=int, default=5,
                         help="Duplicate instances multiple times.")
     parser.add_argument("--short_seq_prob", type=float, default=0.1,

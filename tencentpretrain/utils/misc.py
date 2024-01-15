@@ -4,6 +4,11 @@ import sys
 
 def count_lines(file_path):
     lines_num = 0
+    if file_path.endswith(".json"):
+        import json
+        with open(file_path, 'rb') as f:
+            data = json.load(f)
+            return len(data)
     with open(file_path, 'rb') as f:
         while True:
             data = f.read(2 ** 20)
@@ -34,6 +39,24 @@ def pooling(memory_bank, seg, pooling_type):
         features = memory_bank[:, 0, :]
     return features
 
+
 class ZeroOneNormalize(object):
     def __call__(self, img):
         return img.float().div(255)
+
+
+def expand2square(img, background_color=(122, 116, 104)):
+    from PIL import Image
+    width, height = img.size
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    if width == height:
+        return img
+    elif width > height:
+        result = Image.new(img.mode, (width, width), background_color)
+        result.paste(img, (0, (width - height) // 2))
+        return result
+    else:
+        result = Image.new(img.mode, (height, height), background_color)
+        result.paste(img, ((height - width) // 2, 0))
+        return result
