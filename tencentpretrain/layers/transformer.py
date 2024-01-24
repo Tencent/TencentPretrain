@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from tencentpretrain.layers.multi_headed_attn import MultiHeadedAttention, ParallelMultiHeadedAttention
 from tencentpretrain.layers import *
@@ -198,6 +199,60 @@ class ParallelTransformerLayer(nn.Module):
             return output, mask, prev_attn_out
         else:
             return output, mask
+
+
+class ParallelTransformerLayerPipe(nn.Module):
+
+    def __init__(self, args, model, layer_idx):
+        super(ParallelTransformerLayerPipe, self).__init__()
+        self.layer_idx = layer_idx
+        self.layer_num = args.layers_num
+        self.layernorm_positioning = args.layernorm_positioning
+        self.has_residual_attention = args.has_residual_attention
+        if self.layernorm_positioning == "pre":
+           self.layer_norm = model.encoder.layer_norm 
+        self.layer = model.encoder.transformer[layer_idx]
+
+    def generate_mask(self, seq_length, batch_size, device):
+        mask = torch.ones(seq_length, seq_length, device=device)
+        mask = torch.tril(mask)
+        mask = (1.0 - mask) * -10000
+        mask = mask.repeat(batch_size, 1, 1, 1)
+        return mask
+
+    def forward(self, inputs):
+
+        """
+        Args:
+            hidden: [batch_size x seq_length x emb_size]
+            mask: [batch_size x 1 x seq_length x seq_length]
+            position_bias: [1 x heads_num x seq_length x seq_length]
+        Returns:
+            output: [batch_size x seq_length x hidden_size]
+        """
+
+        if len(inputs)==2:
+            hidden, seg = inputs
+            prev_attn = None
+        else:
+            hidden, seg, prev_attn = inputs
+        batch_size, seq_length, _ = hidden.size()
+        mask = self.generate_mask(seq_length, batch_size, hidden.device)
+        layer_inputs = hidden, mask, prev_attn
+        outputs = self.layer(layer_inputs)
+
+        if self.has_residual_attention:
+            hidden, mask, prev_attn_out = outputs
+        else:
+            hidden, mask = outputs
+
+        if self.layer_idx == self.layer_num-1 and self.layernorm_positioning == "pre":
+            hidden = self.layer_norm(hidden)
+
+        if self.has_residual_attention:
+            return hidden, seg, prev_attn
+        else:
+            return hidden, seg
 
 
 class TransformerDecoderLayer(nn.Module):

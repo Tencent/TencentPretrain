@@ -14,19 +14,22 @@ from tencentpretrain.utils.optimizers import *
 from tencentpretrain.utils import *
 from tencentpretrain.utils.seed import set_seed
 from tencentpretrain.initialize import *
+from tencentpretrain.embeddings.embedding import EmbeddingPipe
+from tencentpretrain.layers.transformer import ParallelTransformerLayerPipe
+from tencentpretrain.targets.target import TargetPipe, CrossEntropy
 
 
 def init_model(args):
     if args.deepspeed:
         import deepspeed
     
-        with deepspeed.zero.Init(data_parallel_group=mpu.get_data_parallel_group() if args.use_mp else None,
+        with deepspeed.zero.Init(data_parallel_group=mpu.get_data_parallel_group() if args.tensor_model_parallel_size > 1 else None,
                             remote_device=None,
                             config_dict_or_path=args.deepspeed_config,
                             enabled=args.enable_zero3 == True,
-                            mpu=mpu if args.use_mp else None ):
+                            mpu=mpu if args.tensor_model_parallel_size > 1 else None ):
             model_for_training = build_model(args)
-        if args.use_mp:
+        if args.tensor_model_parallel_size > 1 :
             for param in model_for_training.parameters():
                 mpu.set_defaults_if_not_set_tensor_model_parallel_attributes(param)
 
@@ -54,18 +57,18 @@ def init_model(args):
     
         if args.deepspeed and args.enable_zero3:
             if os.path.isdir(args.pretrained_model_path):
-                    index_filename = os.path.join(args.pretrained_model_path, "tencentpretrain_model.bin.index.json")
-                    with open(index_filename, "r") as f:
-                        index = json.loads(f.read())
-                    shard_filenames = sorted(set(index["weight_map"].values()))
-                    shard_filenames = [os.path.join(args.pretrained_model_path, f) for f in shard_filenames]
-                    for shard_file in shard_filenames:
-                        model_for_training = _load_state_dict_into_model(model_for_training, shard_file, "")
+                index_filename = os.path.join(args.pretrained_model_path, "tencentpretrain_model.bin.index.json")
+                with open(index_filename, "r") as f:
+                    index = json.loads(f.read())
+                shard_filenames = sorted(set(index["weight_map"].values()))
+                shard_filenames = [os.path.join(args.pretrained_model_path, f) for f in shard_filenames]
+                for shard_file in shard_filenames:
+                    model_for_training = _load_state_dict_into_model(model_for_training, shard_file, "")
             else:
-                    model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path, "")
-                    if args.lora_pretrained_model_path is not None:
-                        model_for_training = _load_state_dict_into_model(model_for_training, args.lora_pretrained_model_path, "")
-        elif args.deepspeed and args.use_mp:
+                model_for_training = _load_state_dict_into_model(model_for_training, args.pretrained_model_path, "")
+                if args.lora_pretrained_model_path is not None:
+                    model_for_training = _load_state_dict_into_model(model_for_training, args.lora_pretrained_model_path, "")
+        elif args.deepspeed and args.tensor_model_parallel_size > 1:
             model_for_training = load_mp_model(model_for_training, args.pretrained_model_path)
         else:
             model_for_training = load_model(model_for_training, args.pretrained_model_path,
@@ -184,33 +187,43 @@ class Trainer(object):
 
         raise NotImplementedError
 
+    def train_pipe(self, loader_iter, model):
+
+        raise NotImplementedError
+
     def train(self, args, local_rank, global_rank, loader, model, optimizer, scheduler):
         model.train()
         loader_iter = iter(loader)
+        if args.pipeline_model_parallel_size > 1:
+            self.seq_length = list(next(loader_iter))[0][0].size(1)
+            loader.start = 0
         while True:
             if self.current_step == self.total_steps + 1:
                 break
-            batch = list(next(loader_iter))
-            self.seq_length = batch[0].size(1)
-            if local_rank is not None:
-                for i in range(len(batch)):
-                    if torch.is_tensor(batch[i]):
-                        batch[i] = batch[i].cuda(local_rank)
-
-            loss = self.forward_propagation(batch, model)
-
-            if args.deepspeed:
-                model.backward(loss)
+            if args.pipeline_model_parallel_size > 1:
+                loss = self.train_pipe(loader_iter, model)
             else:
-                loss.backward()
+                batch = list(next(loader_iter))
+                self.seq_length = batch[0].size(1)
+                if local_rank is not None:
+                    for i in range(len(batch)):
+                        if torch.is_tensor(batch[i]):
+                            batch[i] = batch[i].cuda(local_rank)
 
-            if self.current_step % self.accumulation_steps == 0:
+                loss = self.forward_propagation(batch, model)
+
                 if args.deepspeed:
-                    model.step()
+                    model.backward(loss)
                 else:
-                    optimizer.step()
-                    scheduler.step()
-                    model.zero_grad()
+                    loss.backward()
+
+                if self.current_step % self.accumulation_steps == 0:
+                    if args.deepspeed:
+                        model.step()
+                    else:
+                        optimizer.step()
+                        scheduler.step()
+                        model.zero_grad()
 
             if self.current_step % self.report_steps == 0 and \
                     (not self.dist_train or (self.dist_train and global_rank == 0)):
@@ -338,6 +351,13 @@ class LmTrainer(Trainer):
         loss = model(src, tgt, seg)
 
         self.total_loss += loss.item()
+        loss = loss / self.accumulation_steps
+        return loss
+
+    def train_pipe(self, loader_iter, model):      
+        loss = model.train_batch(data_iter=loader_iter)
+        self.total_loss += loss.item()
+ 
         loss = loss / self.accumulation_steps
         return loss
 
@@ -672,6 +692,27 @@ def worker(local_rank, gpu_ranks, args):
     # Build model.
     model_for_training, model_for_dataloader = init_model(args)
 
+    if args.pipeline_model_parallel_size > 1:
+        from deepspeed.pipe import PipelineModule, TiedLayerSpec, LayerSpec
+        def get_model(model, args):
+            layers = [LayerSpec(EmbeddingPipe, args,model=model),
+                    *[LayerSpec(ParallelTransformerLayerPipe, args,model=model, layer_idx=idx) for idx in
+                        range(args.layers_num)],
+                    LayerSpec(TargetPipe, args=args,model=model)
+                    ]
+            return layers
+        layers = get_model(model_for_training,args)
+        from deepspeed.runtime.pipe.topology import PipeModelDataParallelTopology
+        topo = PipeModelDataParallelTopology(num_pp=mpu.get_pipeline_model_parallel_world_size(),
+                                             num_mp=mpu.get_tensor_model_parallel_world_size(),
+                                             num_dp=mpu.get_data_parallel_world_size())
+
+        model_for_training=PipelineModule(layers=layers, 
+                                          num_stages=args.pipeline_model_parallel_size, 
+                                          activation_checkpoint_interval=args.deepspeed_checkpoint_layers_num,
+                                          loss_fn=CrossEntropy,
+                                          checkpointable_layers=['ParallelTransformerLayerPipe'], topology=topo)
+
     # Build optimizer.
     custom_optimizer, custom_scheduler, optimizer_grouped_parameters = init_optimizer(args, model_for_training)
 
@@ -683,7 +724,7 @@ def worker(local_rank, gpu_ranks, args):
                                                     args=args,
                                                     optimizer=custom_optimizer,
                                                     lr_scheduler=custom_scheduler,
-                                                    mpu=mpu if args.use_mp else None,
+                                                    mpu=mpu if args.tensor_model_parallel_size > 1 and args.pipeline_model_parallel_size == 1 else None,
                                                     dist_init_required=False)
         if args.resume_from_checkpoint is not None:
             load_path, _ = model_for_training.load_checkpoint(
@@ -710,12 +751,9 @@ def worker(local_rank, gpu_ranks, args):
     if args.dist_train:
         if model_for_dataloader is not None:
             model_for_dataloader = model_for_dataloader.module
-        if args.use_mp:
-            train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, global_rank,
-                                                               args.world_size // (args.tensor_model_parallel_size * args.pipeline_model_parallel_size),
-                                                               local_rank, True, model_for_dataloader)
-        else:
-            train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, global_rank, args.world_size, local_rank, True, model_for_dataloader)
+        train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, global_rank,
+                                                           args.world_size // (args.tensor_model_parallel_size * args.pipeline_model_parallel_size),
+                                                           local_rank, True, model_for_dataloader)
     else:
         train_loader = str2dataloader[args.data_processor](args, args.dataset_path, args.batch_size, 0, 1, local_rank, True, model_for_dataloader)
 

@@ -14,7 +14,8 @@ class LmTarget(nn.Module):
         super(LmTarget, self).__init__()
         self.vocab_size = vocab_size
         self.hidden_size = args.hidden_size
-        self.use_mp = args.use_mp
+        self.tensor_model_parallel_size = args.tensor_model_parallel_size
+        self.pipeline_model_parallel_size = args.pipeline_model_parallel_size
         if "label_smoothing" in args:
             self.label_smoothing = args.label_smoothing
         else:
@@ -24,7 +25,7 @@ class LmTarget(nn.Module):
         else:
             self.ignore_index = None
         self.prefix_lm_loss = args.prefix_lm_loss
-        if self.use_mp:
+        if self.tensor_model_parallel_size > 1:
             self.output_layer = mpu.ColumnParallelLinear(self.hidden_size, self.vocab_size, gather_output=False,
                                                          skip_bias_add=True, bias=False)
         else:
@@ -34,8 +35,6 @@ class LmTarget(nn.Module):
 
     def lm(self, memory_bank, tgt_lm, seg):
         # Language modeling (LM) with full softmax prediction.
-
-        tgt_lm = tgt_lm.contiguous().view(-1)
         seg = seg.contiguous().view(-1)
 
         memory_bank = memory_bank.contiguous().view(-1, self.hidden_size)
@@ -44,10 +43,15 @@ class LmTarget(nn.Module):
         # For example seg=[1,1,1,2,2,0], when loss_prefix = 0 , parts of seg > 0 tokens are computed loss
         # when loss_prefix=1 , only parts of seg = 2 tokens are computed loss
         memory_bank = memory_bank[seg > loss_mask, :]
-        tgt_lm = tgt_lm[seg > loss_mask]
+        if tgt_lm is not None:
+            tgt_lm = tgt_lm.contiguous().view(-1)
+            tgt_lm = tgt_lm[seg > loss_mask]
 
         output = self.output_layer(memory_bank)
-        if self.use_mp:
+        if self.pipeline_model_parallel_size > 1:
+
+            return output, loss_mask
+        elif self.tensor_model_parallel_size > 1:
             losses = mpu.vocab_parallel_cross_entropy(output, tgt_lm)
             loss = torch.sum(losses.view(-1)) / len(losses)
         else:

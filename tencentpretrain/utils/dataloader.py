@@ -28,6 +28,7 @@ class Dataloader(object):
         self.span_masking = args.span_masking
         self.span_geo_prob = args.span_geo_prob
         self.span_max_length = args.span_max_length
+        self.pipeline_model_parallel_size = args.pipeline_model_parallel_size
 
     def _fill_buf(self):
         try:
@@ -43,8 +44,6 @@ class Dataloader(object):
             # Reach file end.
             self.dataset_reader.seek(0)
 
-        if self.shuffle:
-            random.shuffle(self.buffer)
         self.start = 0
         self.end = len(self.buffer)
 
@@ -183,10 +182,14 @@ class LmDataloader(Dataloader):
                 src.append(src_single[:-1])
                 tgt.append(src_single[1:])
                 seg.append([1] * ins[1][0] + [0] * (len(src_single) - 1 - ins[1][0]))
-
-            yield torch.LongTensor(src), \
-                torch.LongTensor(tgt), \
-                torch.LongTensor(seg)
+            
+            if self.pipeline_model_parallel_size > 1:
+                yield (torch.LongTensor(src),torch.LongTensor(seg)), \
+                    (torch.LongTensor(tgt),torch.LongTensor(seg))
+            else:
+                yield torch.LongTensor(src), \
+                    torch.LongTensor(tgt), \
+                    torch.LongTensor(seg)
 
 
 class BilmDataloader(Dataloader):
