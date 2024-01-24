@@ -448,10 +448,8 @@ class MtTrainer(Trainer):
     def forward_propagation(self, batch, model):
         src, tgt_out, seg, tgt_in, tgt_seg = batch
         loss_info = model(src, tgt_out, seg, tgt_in, tgt_seg)
-        loss, correct, denominator = loss_info
+        loss = loss_info
         self.total_loss += loss.item()
-        self.total_correct += correct.item()
-        self.total_denominator += denominator.item()
 
         loss = loss / self.accumulation_steps
 
@@ -464,13 +462,11 @@ class MtTrainer(Trainer):
 
         self.logger.info("| {:8d}/{:8d} steps"
               "| {:8.2f} tokens/s"
-              "| loss {:7.2f}"
-              "| acc: {:3.3f}".format(
+              "| loss {:7.2f}".format(
                   self.current_step,
                   self.total_steps,
                   done_tokens / (time.time() - self.start_time),
-                  self.total_loss / self.report_steps,
-                  self.total_correct / self.total_denominator))
+                  self.total_loss / self.report_steps))
 
         self.total_loss = 0.0
         self.total_correct = 0.0
