@@ -9,7 +9,7 @@ class WordEmbedding(nn.Module):
 
     def __init__(self, args, vocab_size):
         super(WordEmbedding, self).__init__()
-        if args.tensor_model_parallel_size > 1:
+        if hasattr(args, "tensor_model_parallel_size") and args.tensor_model_parallel_size > 1:
             self.embedding = mpu.VocabParallelEmbedding(vocab_size, args.emb_size)
         else:
             self.embedding = nn.Embedding(vocab_size, args.emb_size)
