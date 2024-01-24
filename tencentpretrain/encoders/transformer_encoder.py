@@ -20,7 +20,10 @@ class TransformerEncoder(nn.Module):
         self.relative_position_embedding = args.relative_position_embedding
         self.rotary_position_embedding = args.rotary_position_embedding
         self.has_residual_attention = args.has_residual_attention
-        self.tensor_model_parallel_size = args.tensor_model_parallel_size
+        if hasattr(args, "tensor_model_parallel_size"):
+            self.tensor_model_parallel_size = args.tensor_model_parallel_size
+        else:
+            self.tensor_model_parallel_size = 1
 
         if self.relative_position_embedding:
             args.relative_pos_emb = RelativePositionEmbedding(bidirectional=True, heads_num=args.heads_num,
@@ -28,7 +31,7 @@ class TransformerEncoder(nn.Module):
         elif self.rotary_position_embedding:
             args.freqs_cis = precompute_freqs_cis(args.hidden_size // args.heads_num, args.max_seq_length * 2)
 
-        if "deepspeed_checkpoint_activations" in args:
+        if hasattr(args, "deepspeed_checkpoint_activations"):
             self.deepspeed_checkpoint_activations = args.deepspeed_checkpoint_activations
             self.deepspeed_checkpoint_layers_num = args.deepspeed_checkpoint_layers_num
         else:
