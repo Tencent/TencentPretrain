@@ -27,7 +27,7 @@
     "encoder": "transformer",
     "mask": "fully_visible",
     "remove_embedding_layernorm": false,
-    "layernorm_positioning": "post",
+    "layernorm_positioning": "pre",
     "pooling": "first"
   },
 
