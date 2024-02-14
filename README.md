@@ -44,7 +44,6 @@ TencentPretrain has the following features:
 * argparse
 * packaging
 * regex
-* For the mixed precision training you will need apex from NVIDIA
 * For the pre-trained model conversion (related with TensorFlow) you will need TensorFlow
 * For the tokenization with sentencepiece model you will need [SentencePiece](https://github.com/google/sentencepiece)
 * For developing a stacking model you will need LightGBM and [BayesianOptimization](https://github.com/fmfn/BayesianOptimization)
@@ -135,7 +134,7 @@ The above content provides basic ways of using TencentPretrain to pre-process, p
 <br/>
 
 ## Pre-training data
-This section provides links to a range of :arrow_right: [__pre-training data__](https://github.com/Tencent/TencentPretrain/wiki/Pretraining-data) :arrow_left: .
+This section provides links to a range of :arrow_right: [__pre-training data__](https://github.com/Tencent/TencentPretrain/wiki/Pretraining-data) :arrow_left: . TencentPretrain can load these pre-training data directly.
 
 <br/>
 
@@ -145,7 +144,7 @@ This section provides links to a range of :arrow_right: [__downstream datasets__
 <br/>
 
 ## Modelzoo
-With the help of TencentPretrain, we pre-trained models of different properties (e.g. models based on different modalities, encoders, and targets). Detailed introduction of pre-trained models and their download links can be found in :arrow_right: [__modelzoo__](https://github.com/Tencent/TencentPretrain/wiki/Modelzoo) :arrow_left: . All pre-trained models can be loaded by TencentPretrain directly. More pre-trained models will be released in the future.
+With the help of TencentPretrain, we pre-trained models of different properties (e.g. models based on different modalities, encoders, and targets). Detailed introduction of pre-trained models and their download links can be found in :arrow_right: [__modelzoo__](https://github.com/Tencent/TencentPretrain/wiki/Modelzoo) :arrow_left: . All pre-trained models can be loaded by TencentPretrain directly.
 
 <br/>
 
@@ -183,7 +182,7 @@ TencentPretrain/
 
 ```
 
-The code is well-organized. Users can use and extend upon it with little efforts.
+The code is organized based on components (e.g. embeddings, encoders). Users can use and extend upon it with little efforts.
 
 Comprehensive examples of using TencentPretrain can be found in :arrow_right: [__instructions__](https://github.com/Tencent/TencentPretrain/wiki/Instructions) :arrow_left: , which help users quickly implement pre-training models such as BERT, GPT-2, ELMo, T5, CLIP and fine-tune pre-trained models on a range of downstream tasks.
 
