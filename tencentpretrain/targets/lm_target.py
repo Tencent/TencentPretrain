@@ -14,8 +14,14 @@ class LmTarget(nn.Module):
         super(LmTarget, self).__init__()
         self.vocab_size = vocab_size
         self.hidden_size = args.hidden_size
-        self.tensor_model_parallel_size = args.tensor_model_parallel_size
-        self.pipeline_model_parallel_size = args.pipeline_model_parallel_size
+        if hasattr(args, "tensor_model_parallel_size"):
+            self.tensor_model_parallel_size = args.tensor_model_parallel_size
+        else:
+            self.tensor_model_parallel_size = 1
+        if hasattr(args, "pipeline_model_parallel_size"):
+            self.pipeline_model_parallel_size = args.pipeline_model_parallel_size
+        else:
+            self.pipeline_model_parallel_size = 1
         if "label_smoothing" in args:
             self.label_smoothing = args.label_smoothing
         else:
