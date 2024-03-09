@@ -153,12 +153,12 @@ TencentPretrain is organized as follows：
 ```
 TencentPretrain/
     |--tencentpretrain/
-    |    |--embeddings/ # contains embedding modules
-    |    |--encoders/ # contains encoder modules such as RNN, CNN, Transformer
-    |    |--decoders/ # contains decoder modules
-    |    |--targets/ # contains target modules such as language modeling, masked language modeling
-    |    |--layers/ # contains frequently-used NN layers, such as normalization layer
-    |    |--models/ # contains model.py, which combines modules of different parts
+    |    |--embeddings/ # contains modules of embedding component
+    |    |--encoders/ # contains modules of encoder component such as RNN, CNN, Transformer
+    |    |--decoders/ # contains modules of decoder component
+    |    |--targets/ # contains modules of target component such as language modeling, masked language modeling
+    |    |--layers/ # contains frequently-used NN layers
+    |    |--models/ # contains model.py, which combines modules of different components
     |    |--utils/ # contains frequently-used utilities
     |    |--model_builder.py
     |    |--model_loader.py
