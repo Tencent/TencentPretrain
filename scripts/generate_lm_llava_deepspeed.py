@@ -14,6 +14,9 @@ from torchvision.io import read_image
 from torchvision.io.image import ImageReadMode
 import imghdr
 import deepspeed
+import numpy as np
+from PIL import Image
+import torchvision.transforms.functional as transform
 
 tencentpretrain_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(tencentpretrain_dir)
@@ -24,7 +27,7 @@ from tencentpretrain.targets import *
 from tencentpretrain.utils.constants import *
 from tencentpretrain.utils import *
 from tencentpretrain.utils.config import load_hyperparam
-from tencentpretrain.opts import infer_opts, tokenizer_opts, log_opts, mp_opts
+from tencentpretrain.opts import infer_opts, tokenizer_opts, log_opts, mp_opts, lora_opts
 from tencentpretrain.opts import deepspeed_opts
 from tencentpretrain.utils.logging import init_logger
 from tencentpretrain.model_loader import _load_state_dict_into_model, load_model
@@ -35,11 +38,18 @@ class LLaVaGenerate(nn.Module):
     def __init__(self, args):
         super(LLaVaGenerate, self).__init__()
         self.args = args
+        lora_params = args.lora_params
+        if "embedding" in args.use_lora_except:
+            args.lora_params = None
         self.embedding = Embedding(args)
         for embedding_name in args.embedding:
             tmp_emb = str2embedding[embedding_name](args, len(args.tokenizer.vocab))
             self.embedding.update(tmp_emb, embedding_name)
 
+        if "encoder" in args.use_lora_except:
+            args.lora_params = None
+        else:
+            args.lora_params = lora_params
         self.encoder = str2encoder[args.encoder](args)
         self.pooling_type = args.pooling
 
@@ -94,6 +104,9 @@ def load_or_initialize_parameters(args, model):
         keys_info = model.load_state_dict(torch.load(args.pretrained_model_path, map_location="cpu"), strict=False)
         args.logger.info("missing_keys: {0}".format(keys_info.missing_keys))
         args.logger.info("unexpected_keys: {0}".format(keys_info.unexpected_keys))
+        if args.lora_pretrained_model_path is not None:
+            args.logger.info("loading model from {0}".format(args.lora_pretrained_model_path))  
+            model = load_model(model, args.lora_pretrained_model_path)
         if args.vision_model_in_VL_emb_path is not None:
             args.logger.info("loading model from {0}".format(args.vision_model_in_VL_emb_path))   
             model = load_model(model, args.vision_model_in_VL_emb_path)
@@ -112,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument("--top_k", type=int, default=70)
     parser.add_argument("--top_p", type=float, default=0)
     parser.add_argument("--temperature", type=float, default=1.0)
-    parser.add_argument("--instruction_template", type=str, choices=["sys0", "sys1", "sys2", "sys3", "sys4"],
+    parser.add_argument("--instruction_template", type=str, choices=["sys0", "sys1", "sys2", "sys3", "sys4", "sys5"],
                         help="The instruction type for training large language-vision model.", default="sys0")
     parser.add_argument("--vision_model_in_VL_emb_path", type=str, default=None,
                         help="Path of the vision pretrained model in the vision language embedding.")
@@ -123,6 +136,8 @@ if __name__ == '__main__':
     log_opts(parser)
 
     mp_opts(parser)
+
+    lora_opts(parser)
 
     args = parser.parse_args()
 
@@ -137,6 +152,16 @@ if __name__ == '__main__':
 
     args.pretrained_model_path = args.load_model_path
 
+    # construct lora dict parameters.
+    if args.use_lora:
+        args.lora_params = {
+            "lora_r": args.lora_r,
+            "lora_alpha": args.lora_alpha,
+            "lora_dropout": args.lora_dropout
+        }
+    else:
+        args.lora_params = None
+
     # Load or initialize parameters.
     if args.enable_zero3:
         print("enable_zero3:", args.enable_zero3)
@@ -144,6 +169,8 @@ if __name__ == '__main__':
             model = LLaVaGenerate(args)
             if args.pretrained_model_path:
                 model = _load_state_dict_into_model(model, args.pretrained_model_path)
+                if args.lora_pretrained_model_path is not None:
+                    model = _load_state_dict_into_model(model, args.lora_pretrained_model_path)
             if args.vision_model_in_VL_emb_path is not None:
                 model = _load_state_dict_into_model(model, args.vision_model_in_VL_emb_path)
     else:
@@ -180,10 +207,15 @@ if __name__ == '__main__':
         "sys1": "<<SYS>>\nYou are a helpful language and vision assistant. You are able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.\n<</SYS>>\n\n",
         "sys2": "<<SYS>>\nA chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions.\n<</SYS>>\n\n",
         "sys3": "<SYS> You are a helpful language and vision assistant. </SYS> \n",
-        "sys4": "[INST]<<SYS>>\nYou are a helpful language and vision assistant. You are able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.\n<</SYS>>\n\n"
+        "sys4": "[INST]<<SYS>>\nYou are a helpful language and vision assistant. You are able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.\n<</SYS>>\n\n",
+        "sys5": "A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions.\n"
     }
-    role1, role2 = "USER", "ASSISTANT"
-    im_start, im_end = "<Image>", "</Image>"
+    if args.instruction_template == "sys0":
+        role1, role2 = "### Instruction", "### Output"
+    else:
+        role1, role2 = "USER", "ASSISTANT"
+
+    im_start, im_end = " ", ""
     num_image_tokens = int(image_width / patch_size) * int(image_height / patch_size) + 1 # 336/14-14 --> 576 dim + 1
     seq_text = args.seq_length - num_image_tokens
     input_f = open(args.test_path, mode="r", encoding="utf-8")
@@ -193,32 +225,29 @@ if __name__ == '__main__':
     except:
         args.logger.info("unsupported prompt template!")
         NotImplementedError
-    with open(args.prediction_path, mode="a", encoding="utf-8") as outf:
+
+    with open(args.prediction_path, mode="w", encoding="utf-8") as outf:
         for line_id, item in enumerate(datas):
             try:
-                id = item["id"]
-                image_path = "datasets/llava/" + item["image"]
+                if "datasets" not in item["image"]:
+                    image_path = "datasets/llava/" + item["image"]
+                else:
+                    image_path = item["image"]
                 if not os.path.isfile(image_path):
                     continue
                 if imghdr.what(image_path) != 'jpeg' and imghdr.what(image_path) != 'png':
                     continue
+                image = Image.open(image_path)
                 if "pad" in args.image_preprocess:
-                    from PIL import Image
-                    import numpy as np
-                    import torchvision.transforms.functional as transform
-                    image = Image.open(image_path)
                     image = expand2square(image)
-                    image = torch.from_numpy((np.array(image).transpose(2,0,1)))
-                else:
-                    image = read_image(image_path, ImageReadMode.RGB)
-
+                image = torch.from_numpy((np.array(image).transpose(2,0,1)))
                 image = image.to(device)
                 src_image = transform(image)
             except:
                 print("sth wrong with item{}".format(item))
                 continue
 
-            prompt_before_image = prompt_overall + " " + role1 + ": "
+            prompt_before_image = prompt_overall + role1 + ": "
             ground_truth = []
             prompt_answer_id = []
             if "conversations" in item:
@@ -228,19 +257,20 @@ if __name__ == '__main__':
                     if i > 1:
                         continue
                     if i == 0:
-                        prompt = conv["value"]
-                        if prompt.endswith("<image>"):
-                            prompt_before_image = prompt_before_image + prompt.replace("<image>", im_start)
-                            prompt_after_image = im_end + "\n" + role2 + ": "
-                        elif prompt.startswith("<image>"):
-                            prompt_before_image = prompt_before_image + im_start
-                            prompt_after_image = prompt.replace("<image>", im_end) + "\n" + role2 + ": "
+                        if isinstance(conv, str):
+                            prompt = conv
+                        else:
+                            prompt = conv["value"]
+                        if "<image>" in prompt:
+                            before_image, after_image = prompt.split("<image>")
+                            prompt_before_image = prompt_before_image + before_image + im_start
+                            prompt_after_image = im_end + "\n" + after_image +  " " + role2 + ":"
                         else:
                             prompt_before_image = prompt_before_image + im_start
-                            prompt_after_image = im_end + "\n" + prompt + " " + role2 + ": "
+                            prompt_after_image = im_end + "\n" + prompt + " " + role2 + ":"
 
                         prompt_before_image_id = args.tokenizer.convert_tokens_to_ids(
-                            args.tokenizer.tokenize(prompt_before_image)
+                            [CLS_TOKEN] + args.tokenizer.tokenize(prompt_before_image)
                         )
                         prompt_after_image_id = args.tokenizer.convert_tokens_to_ids(
                             args.tokenizer.tokenize(prompt_after_image)
@@ -255,7 +285,7 @@ if __name__ == '__main__':
                     elif i % 2 == 0: # human
                         prompt = conv["value"]
                         prompt_id = args.tokenizer.convert_tokens_to_ids(
-                            args.tokenizer.tokenize(role1 + ": " + prompt + " " + role2 + ": ")
+                            args.tokenizer.tokenize(role1 + ":" + prompt + " " + role2 + ":")
                         )
                         if prompt_answer_id:
                             prompt_answer_id.append(prompt_id)
@@ -264,11 +294,15 @@ if __name__ == '__main__':
                             args.logger.info("no prompt, or prompt too long, jumping")
                             break
                     else: # gpt
-                        ground_truth.append(conv["value"])
+                        if isinstance(conv, str):
+                            answer = conv
+                        else:
+                            answer = conv["value"]
+                        ground_truth.append(answer)
             else:
                 prompt = item["instruction"]
                 prompt_before_image = prompt_before_image + im_start
-                prompt_after_image = im_end + "\n" + prompt + "\n" + role2 + ": "
+                prompt_after_image = im_end + "\n" + prompt + " " + role2 + ":"
                 prompt_before_image_id = args.tokenizer.convert_tokens_to_ids(
                     args.tokenizer.tokenize(prompt_before_image)
                 )
@@ -285,7 +319,8 @@ if __name__ == '__main__':
 
             image_pos = len(prompt_before_image_id)
             
-            image_tensor = torch.unsqueeze(src_image, 0).half()
+            # image_tensor = torch.unsqueeze(src_image, 0).half()
+            image_tensor = torch.unsqueeze(src_image, 0).bfloat16()
             image_seg_tensor = torch.ones(1, num_image_tokens).to(device)
             image_pos = torch.LongTensor([image_pos]).to(device)
             SEP_ID = args.tokenizer.convert_tokens_to_ids([SEP_TOKEN])
@@ -315,6 +350,7 @@ if __name__ == '__main__':
                     generated_sentence = "".join(args.tokenizer.convert_ids_to_tokens(tokens))
                 print(item)
                 print(generated_sentence)
-                print("\t".join(item.values()) + "\n", file=outf)
+                print(item, file=outf)
+                print("\n", file=outf)
                 print(generated_sentence + "\n\n", file=outf)
 

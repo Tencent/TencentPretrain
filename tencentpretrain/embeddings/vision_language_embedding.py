@@ -52,7 +52,7 @@ class VisionLanguageEmbedding(nn.Module):
         # image features
         with torch.no_grad():
             image_emb = self.vision_embedding(src_image, seg_image)
-            image_emb = self.vision_encoder(image_emb, seg_image)[:,1:,:]
+            image_emb = self.vision_encoder(image_emb, seg_image, output_layer=-2)[:,1:,:]
         image_emb = self.projection(image_emb)
         # text embedding
         text_emb = self.text_embedding(src_text, seg_text)

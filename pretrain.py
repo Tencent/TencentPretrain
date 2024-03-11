@@ -37,8 +37,6 @@ def main():
                         help="Number of prediction labels.")
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout value.")
     parser.add_argument("--seed", type=int, default=7, help="Random seed.")
-    parser.add_argument("--seq_length", type=int, default=128,
-                        help="Sequence length.")
 
     # Preprocess options.
     tokenizer_opts(parser)

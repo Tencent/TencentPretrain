@@ -1091,7 +1091,7 @@ class LlavaDataset(Dataset):
         import json
         PAD_ID = self.tokenizer.convert_tokens_to_ids([PAD_TOKEN])[0]
         role1, role2 = "USER", "ASSISTANT"
-        im_start, im_end = "<Image>", "</Image>"
+        im_start, im_end = " ", ""
         print("Worker %d is building dataset ... " % proc_id)
         set_seed(self.seed)
         dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
@@ -1110,19 +1110,29 @@ class LlavaDataset(Dataset):
                     skip_item += 1
                     continue
                 conversations = item["conversations"]
-
-                prompt_before_image = role1 + ": "
+                if "instruction" in item.keys():
+                    inst = item["instruction"]
+                else:
+                    inst = "A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions."
+                if inst:
+                    prompt_before_image = inst + " " + role1 + ":"
+                else:
+                    prompt_before_image = role1 + ":"
                 prompt_answer_seg_nums, tgt_seg_nums = [], []
                 for i, conv in enumerate(conversations):
                     if i == 0:
-                        prompt = conv["value"]
-                        if prompt.endswith("<image>"):
-                            prompt_before_image = prompt_before_image + prompt.replace("<image>", im_start)
-                            prompt_after_image = im_end + "\n" + role2 + ": "
-                        elif prompt.startswith("<image>"):
+                        if isinstance(conv, str):
+                            prompt = conv
+                        else:
+                            prompt = conv["value"]
+                        if "<image>" in prompt:
+                            before_image, after_image = prompt.split("<image>")
+                            prompt_before_image = prompt_before_image + before_image + im_start
+                            prompt_after_image = im_end + "\n" + after_image +  " " + role2 + ":"
+                        else:
                             prompt_before_image = prompt_before_image + im_start
-                            prompt_after_image = prompt.replace("<image>", im_end) + "\n" + role2 + ": "
-                        prompt_before_image_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(prompt_before_image))
+                            prompt_after_image = im_end + "\n" + prompt + " " + role2 + ":"
+                        prompt_before_image_id = self.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + self.tokenizer.tokenize(prompt_before_image))
                         prompt_after_image_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(prompt_after_image))
                         seg_before_image = [1] * len(prompt_before_image_id)
                         seg_after_image = [1] * len(prompt_after_image_id)
@@ -1133,8 +1143,11 @@ class LlavaDataset(Dataset):
                         tgt_id = [PAD_ID] * (len(prompt_answer_id) - 1)
                         tgt_seg_nums = [len(tgt_id)]
                     elif i % 2 == 0: # human
-                        prompt = conv["value"]
-                        prompt_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(role1 + ": " + prompt + "\n" + role2 + ": "))
+                        if isinstance(conv, str):
+                            prompt = conv
+                        else:
+                            prompt = conv["value"]
+                        prompt_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(role1 + ":" + prompt + " " + role2 + ":"))
                         prompt_answer_id = prompt_answer_id + prompt_id
                         tgt_id = tgt_id + [PAD_ID] * len(prompt_id)
                         if len(tgt_seg_nums) == 1:
@@ -1142,7 +1155,10 @@ class LlavaDataset(Dataset):
                         else:
                             tgt_seg_nums = tgt_seg_nums + [len(prompt_id)]
                     else: # gpt
-                        answer = conv["value"]
+                        if isinstance(conv, str):
+                            answer = conv
+                        else:
+                            answer = conv["value"]
                         answer_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(answer) + [SEP_TOKEN])
                         prompt_answer_id = prompt_answer_id + answer_id
                         tgt_id = tgt_id + answer_id

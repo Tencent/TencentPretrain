@@ -10,6 +10,12 @@ def gelu(x):
 def gelu_fast(x):
     return 0.5 * x * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * torch.pow(x, 3.0))))
 
+def gelu_quick(x):
+    """
+    Applies GELU approximation that is fast but somewhat inaccurate. See: https://github.com/hendrycks/GELUs
+    """
+    return x * torch.sigmoid(1.702 * x)
+
 def relu(x):
     return F.relu(x)
 
