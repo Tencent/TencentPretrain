@@ -6,13 +6,13 @@
     "hidden_act": "gelu",
     "heads_num": 8,
     "layers_num": 12,
-    "max_seq_length": 512,
+    "max_seq_length": 77,
     "embedding": ["word", "pos"],
     "encoder": "transformer",
-    "mask": "fully_visible",
-    "remove_embedding_layernorm": false,
-    "layernorm_positioning": "post",
-    "pooling": "first"
+    "mask": "causal",
+    "remove_embedding_layernorm": true,
+    "layernorm_positioning": "pre",
+    "pooling": "last"
   },
 
   "stream_1": {
@@ -26,7 +26,7 @@
     "embedding": ["patch", "pos"],
     "encoder": "transformer",
     "mask": "fully_visible",
-    "remove_embedding_layernorm": true,
+    "remove_embedding_layernorm": false,
     "layernorm_positioning": "pre",
     "pooling": "first"
   },
