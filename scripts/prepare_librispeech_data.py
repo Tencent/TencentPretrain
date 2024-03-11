@@ -13,7 +13,7 @@ import random
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_path", required=True)
-    parser.add_argument("--output_file", required=True)
+    parser.add_argument("--output_path", required=True)
     parser.add_argument("--add_column", action='store_true')
     parser.add_argument("--sample_ratio", type=float, default=1.0)
     parser.add_argument("--ext", default="flac")
@@ -21,14 +21,14 @@ def main():
     args = parser.parse_args()
 
     rand = random.Random(args.seed)
-    os.makedirs(os.path.dirname(os.path.realpath(args.output_file)), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.realpath(args.output_path)), exist_ok=True)
 
     dir_path = os.path.realpath(args.input_path)
     search_path = os.path.join(dir_path, "**/*." + args.ext)
 
     transcriptions = {}
 
-    with open(args.output_file, "w") as out_file:
+    with open(args.output_path, "w") as out_file:
         if args.add_column:
             print("text" + "\t" + "wav_path", file=out_file)
         else:
