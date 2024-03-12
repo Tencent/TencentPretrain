@@ -966,3 +966,7 @@ class LlmSftDataloader(Dataloader):
             yield torch.LongTensor(src), \
                   torch.LongTensor(tgt), \
                   torch.LongTensor(seg)
+
+
+class LlmPretrainDataloader(LmDataloader):
+    pass
