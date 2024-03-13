@@ -63,7 +63,7 @@ class TransformerEncoder(nn.Module):
             self.freqs_cis = precompute_freqs_cis(args.hidden_size // args.heads_num, args.max_seq_length * 2)
 
 
-    def forward(self, emb, seg):
+    def forward(self, emb, seg, output_layer=-1):
         """
         Args:
             emb: [batch_size x seq_length x emb_size]
@@ -129,12 +129,16 @@ class TransformerEncoder(nn.Module):
             while l < self.layers_num:
                 inputs = checkpointing.checkpoint(custom(l, l + self.deepspeed_checkpoint_layers_num), inputs)
                 l += self.deepspeed_checkpoint_layers_num
+                if output_layer != -1 and l == self.layers_num + output_layer:
+                    return inputs[0]
         else:
             for i in range(self.layers_num):
                 if self.parameter_sharing:
                     inputs = self.transformer(inputs)
                 else:
                     inputs = self.transformer[i](inputs)
+                if output_layer != -1 and i == self.layers_num + output_layer:
+                    return inputs[0]
 
         hidden = inputs[0]
 
