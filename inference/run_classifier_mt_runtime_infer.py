@@ -8,6 +8,7 @@ import argparse
 
 import numpy as np
 import onnxruntime as ort
+import pandas as pd
 import torch.nn as nn
 
 tencentpretrain_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -65,6 +66,8 @@ def infer_opts(parser):
     # Path options.
     parser.add_argument("--load_model_path", default=None, type=str, help="Path of the input model.")
     parser.add_argument("--config_path", type=str, required=True, help="Path of the config file.")
+    parser.add_argument("--test_path", type=str, required=False, help="Path of the testset.")
+    parser.add_argument("--prediction_path", type=str, required=False, help="Path of the prediction file.")
 
     # Model options.
     model_opts(parser)
@@ -85,7 +88,8 @@ def init_args():
     parser.add_argument("--output_prob", action="store_true", help="Write probabilities to output file.")
     parser.add_argument("--labels_num_list", default=[], nargs='+', type=int, help="Dataset labels num list.")
 
-    parser.add_argument("--input_text", required=True, type=str, help="Data of the input text.")
+    parser.add_argument("--text_a", required=False, type=str, help="Data of the input text_a.")
+    parser.add_argument("--text_b", required=False, type=str, help="Data of the input text_b.")
     parser.add_argument("--infer_framework", default="torch", type=str, help="Framework of inference.")
 
     log_opts(parser)
@@ -118,9 +122,16 @@ def init_model(args):
     return model
 
 
-def pre_process(args, text):
-    src = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(text) + [SEP_TOKEN])
-    seg = [1] * len(src)
+def pre_process(args, text_a, text_b: str = None, is_batch: bool = False):
+    if text_b is None:  # Sentence classification.
+        src = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(text_a) + [SEP_TOKEN])
+        seg = [1] * len(src)
+    else:  # Sentence pair classification.
+        src_a = args.tokenizer.convert_tokens_to_ids([CLS_TOKEN] + args.tokenizer.tokenize(text_a) + [SEP_TOKEN])
+        src_b = args.tokenizer.convert_tokens_to_ids(args.tokenizer.tokenize(text_b) + [SEP_TOKEN])
+        src = src_a + src_b
+        seg = [1] * len(src_a) + [2] * len(src_b)
+
     if len(src) > args.seq_length:
         src = src[: args.seq_length]
         seg = seg[: args.seq_length]
@@ -128,6 +139,9 @@ def pre_process(args, text):
     while len(src) < args.seq_length:
         src.append(PAD_ID)
         seg.append(0)
+
+    if is_batch:
+        return src, seg
 
     src = torch.LongTensor([src])
     seg = torch.LongTensor([seg])
@@ -138,19 +152,23 @@ def post_process(logits):
     pred = [torch.argmax(logits_i, dim=-1) for logits_i in logits]
     prob = [nn.Softmax(dim=-1)(logits_i) for logits_i in logits]
 
-    logits = [x.cpu().numpy().tolist()[0] for x in logits]
-    pred = [x.cpu().numpy().tolist()[0] for x in pred]
-    prob = [x.cpu().numpy().tolist()[0] for x in prob]
+    logits = [x.cpu().numpy().tolist() for x in logits]
+    pred = [x.cpu().numpy().tolist() for x in pred]
+    prob = [x.cpu().numpy().tolist() for x in prob]
 
-    pred_output = "|".join([str(v) for v in pred])
-    prob_output = "|".join([" ".join(["{0:.4f}".format(w) for w in v]) for v in prob])
-    logits_output = "|".join([" ".join(["{0:.4f}".format(w) for w in v]) for v in logits])
+    pred_outputs, prob_outputs, logits_outputs = [], [], []
+
+    for j in range(len(pred[0])):
+        pred_outputs.append("|".join([str(v[j]) for v in pred]))
+        logits_outputs.append("|".join([" ".join(["{0:.4f}".format(w) for w in v[j]]) for v in logits]))
+        prob_outputs.append("|".join([" ".join(["{0:.4f}".format(w) for w in v[j]]) for v in prob]))
+
     if args.output_logits:
-        return pred_output, logits_output
+        return pred_outputs, logits_outputs
     elif args.output_prob:
-        return pred_output, prob_output
+        return pred_outputs, prob_outputs
     else:
-        return pred_output, prob_output
+        return pred_outputs, prob_outputs
 
 
 def inference_torch(model, src, seg):
@@ -170,32 +188,102 @@ def transfer_torch_2_onnx(src, seg, model, onnx_path: str = "your_onnx_model.onn
     output_names = ["output"]
     dummy_input = (src.to(device), None, seg.to(device))
     torch.onnx.export(model, dummy_input, onnx_path, export_params=True, do_constant_folding=True,
-                      input_names=input_names, output_names=output_names)
+                      input_names=input_names, output_names=output_names,
+                      dynamic_axes={"input": {0: "batch_size"}, "seg": {0: "batch_size"}, "output": {0: "batch_size"}})
     print(f"ONNX model saved at: {onnx_path}")
 
 
-def classify_torch(text):
-    src, seg = pre_process(args, text)
+def save_torch_as_onnx(onnx_model_path: str = "your_onnx_model.onnx"):
+    """
+    Transfer Torch model to ONNX format
+    """
+    src, seg = pre_process(args, "Hello, World")
     model = init_model(args)
-    if not os.path.exists("your_onnx_model.onnx"):
-        transfer_torch_2_onnx(src, seg, model)
+    transfer_torch_2_onnx(src, seg, model, onnx_model_path)
+
+
+def classify_torch(text_a, text_b: str = None):
+    src, seg = pre_process(args, text_a, text_b)
+    model = init_model(args)
     logits = inference_torch(model, src, seg)
     return post_process(logits)
 
 
-def classify_onnx(text):
-    src, seg = pre_process(args, text)
+def classify_onnx(text_a, text_b: str = None):
+    src, seg = pre_process(args, text_a, text_b)
     ort_session = ort.InferenceSession(args.load_model_path)
     logits = inference_onnx(ort_session, src, seg)
     return post_process(logits)
 
 
-args = init_args()
+def batch_loader(batch_size, src, seg):
+    instances_num = src.size()[0]
+    for i in range(instances_num // batch_size):
+        src_batch = src[i * batch_size: (i + 1) * batch_size, :]
+        seg_batch = seg[i * batch_size: (i + 1) * batch_size, :]
+        yield src_batch, seg_batch
+    if instances_num > instances_num // batch_size * batch_size:
+        src_batch = src[instances_num // batch_size * batch_size:, :]
+        seg_batch = seg[instances_num // batch_size * batch_size:, :]
+        yield src_batch, seg_batch
 
-if __name__ == "__main__":
+
+def batch_classify():
+    global model, ort_session
+
+    df = pd.read_csv(args.test_path)
+    dataset = []
+    columns = df.columns.values.tolist()
+    for idx, item in enumerate(df.itertuples()):
+        text_a = getattr(item, "text_a")
+        text_b = getattr(item, "text_b") if "text_b" in columns else None
+        src, seg = pre_process(args, text_a, text_b, True)
+        dataset.append((src, seg))
+
+    src = torch.LongTensor([sample[0] for sample in dataset])
+    seg = torch.LongTensor([sample[1] for sample in dataset])
+
+    batch_size = args.batch_size
+    instances_num = src.size()[0]
+    print("The number of prediction instances: {0}".format(instances_num))
+
+    # Load model
     if args.infer_framework == "torch":
-        print(classify_torch(args.input_text))
+        model = init_model(args)
     elif args.infer_framework == "onnx":
-        print(classify_onnx(args.input_text))
+        ort_session = ort.InferenceSession(args.load_model_path)
     else:
         print("Not supported format: %s" % args.infer_framework)
+        return
+
+    results = []
+    for _, (src_batch, seg_batch) in enumerate(batch_loader(batch_size, src, seg)):
+        if args.infer_framework == "torch":
+            logits = inference_torch(model, src_batch, seg_batch)
+        else:
+            logits = inference_onnx(ort_session, src_batch, seg_batch)
+        result = post_process(logits)
+        results += [(pred, score) for pred, score in zip(result[0], result[1])]
+
+    # Save as local file
+    columns = ["label", "logits" if args.output_logits else "prob"]
+    pd.DataFrame(results, columns=columns).to_csv(args.prediction_path, sep="\t", encoding="utf-8", index=False)
+
+
+args = init_args()
+
+
+def main():
+    if args.test_path is not None:
+        batch_classify()
+        return
+    if args.infer_framework == "torch":
+        print(classify_torch(args.text_a, args.text_b))
+    elif args.infer_framework == "onnx":
+        print(classify_onnx(args.text_a, args.text_b))
+    else:
+        print("Not supported format: %s" % args.infer_framework)
+
+
+if __name__ == "__main__":
+    main()
