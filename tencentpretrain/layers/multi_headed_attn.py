@@ -26,7 +26,7 @@ class MultiHeadedAttention(nn.Module):
     self-attention refers to https://arxiv.org/pdf/1706.03762.pdf
     """
 
-    def __init__(self, hidden_size, heads_num, attention_head_size, local_kv_heads_num, dropout, has_bias=True, with_scale=True,
+    def __init__(self, hidden_size, heads_num, attention_head_size, local_kv_heads_num, dropout, max_seq_length, has_bias=True, with_scale=True,
                  lora_params=None, layer_number=None):
         super(MultiHeadedAttention, self).__init__()
         self.heads_num = heads_num
@@ -41,6 +41,15 @@ class MultiHeadedAttention(nn.Module):
         assert heads_num % self.local_kv_heads_num == 0, "heads_num should be divisible by n_local_kv_heads"
         self.repeat_num = self.heads_num // self.local_kv_heads_num
 
+        self.max_seq_length = max_seq_length
+
+        logn_list = [
+            math.log(i, self.max_seq_length) if i > self.max_seq_length else 1
+            for i in range(1, 32768)
+        ]
+        logn_tensor = torch.tensor(logn_list)[None, :, None, None]
+        self.register_buffer("logn_tensor", logn_tensor, persistent=False)
+        
         if lora_params is not None:
 
             self.linear_layers = nn.ModuleList(
@@ -66,7 +75,7 @@ class MultiHeadedAttention(nn.Module):
             self.layer_number = None
 
     def forward(self, key, value, query, mask, position_bias=None, has_residual_attention=False, prev_attn=None,
-                freqs_cis=None, alibi=None):
+                freqs_cis=None, alibi=None, use_logn_attn=False):
         """
         Args:
             key: [batch_size x seq_length x hidden_size]
@@ -106,6 +115,13 @@ class MultiHeadedAttention(nn.Module):
 
         if freqs_cis is not None:
             query, key = apply_rotary_emb(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
+
+        key_size = key.size(2)
+        if key_size > self.max_seq_length and use_logn_attn and not self.training:
+            seq_start = key_size - query.size(2)
+            seq_end = key_size
+            logn_tensor = self.logn_tensor[:, seq_start:seq_end, :, :].type_as(query)
+            query = query * logn_tensor.expand_as(query)
 
         scores = torch.matmul(query, key.transpose(-2, -1))
 
