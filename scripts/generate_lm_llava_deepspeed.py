@@ -27,7 +27,7 @@ from tencentpretrain.targets import *
 from tencentpretrain.utils.constants import *
 from tencentpretrain.utils import *
 from tencentpretrain.utils.config import load_hyperparam
-from tencentpretrain.opts import infer_opts, tokenizer_opts, log_opts, mp_opts, lora_opts
+from tencentpretrain.opts import infer_opts, tokenizer_opts, log_opts, mp_opts
 from tencentpretrain.opts import deepspeed_opts
 from tencentpretrain.utils.logging import init_logger
 from tencentpretrain.model_loader import _load_state_dict_into_model, load_model
@@ -38,18 +38,11 @@ class LLaVaGenerate(nn.Module):
     def __init__(self, args):
         super(LLaVaGenerate, self).__init__()
         self.args = args
-        lora_params = args.lora_params
-        if "embedding" in args.use_lora_except:
-            args.lora_params = None
         self.embedding = Embedding(args)
         for embedding_name in args.embedding:
             tmp_emb = str2embedding[embedding_name](args, len(args.tokenizer.vocab))
             self.embedding.update(tmp_emb, embedding_name)
 
-        if "encoder" in args.use_lora_except:
-            args.lora_params = None
-        else:
-            args.lora_params = lora_params
         self.encoder = str2encoder[args.encoder](args)
         self.pooling_type = args.pooling
 
@@ -104,9 +97,7 @@ def load_or_initialize_parameters(args, model):
         keys_info = model.load_state_dict(torch.load(args.pretrained_model_path, map_location="cpu"), strict=False)
         args.logger.info("missing_keys: {0}".format(keys_info.missing_keys))
         args.logger.info("unexpected_keys: {0}".format(keys_info.unexpected_keys))
-        if args.lora_pretrained_model_path is not None:
-            args.logger.info("loading model from {0}".format(args.lora_pretrained_model_path))  
-            model = load_model(model, args.lora_pretrained_model_path)
+
         if args.vision_model_in_VL_emb_path is not None:
             args.logger.info("loading model from {0}".format(args.vision_model_in_VL_emb_path))   
             model = load_model(model, args.vision_model_in_VL_emb_path)
@@ -137,8 +128,6 @@ if __name__ == '__main__':
 
     mp_opts(parser)
 
-    lora_opts(parser)
-
     args = parser.parse_args()
 
     args.target = "lm"
@@ -152,16 +141,6 @@ if __name__ == '__main__':
 
     args.pretrained_model_path = args.load_model_path
 
-    # construct lora dict parameters.
-    if args.use_lora:
-        args.lora_params = {
-            "lora_r": args.lora_r,
-            "lora_alpha": args.lora_alpha,
-            "lora_dropout": args.lora_dropout
-        }
-    else:
-        args.lora_params = None
-
     # Load or initialize parameters.
     if args.enable_zero3:
         print("enable_zero3:", args.enable_zero3)
@@ -169,8 +148,6 @@ if __name__ == '__main__':
             model = LLaVaGenerate(args)
             if args.pretrained_model_path:
                 model = _load_state_dict_into_model(model, args.pretrained_model_path)
-                if args.lora_pretrained_model_path is not None:
-                    model = _load_state_dict_into_model(model, args.lora_pretrained_model_path)
             if args.vision_model_in_VL_emb_path is not None:
                 model = _load_state_dict_into_model(model, args.vision_model_in_VL_emb_path)
     else:
