@@ -1,4 +1,5 @@
 import torch
+import math
 from typing import Tuple
 
 def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0):
@@ -8,6 +9,19 @@ def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0):
     freqs_cis = torch.polar(torch.ones_like(freqs), freqs)  # complex64
     return freqs_cis
 
+def get_ntk_alpha(true_seq_len, max_seq_length):
+    context_value = math.log(true_seq_len / max_seq_length, 2) + 1
+    ntk_alpha = 2 ** math.ceil(context_value) - 1
+    ntk_alpha = max(ntk_alpha, 1)
+    return ntk_alpha
+
+def update_freqs_cis(dim: int, end: int, theta: float = 10000.0, ntk_alpha: float = 1.0):
+    theta = theta * ntk_alpha ** (dim / (dim - 2))
+    freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
+    t = torch.arange(end, device=freqs.device)  # type: ignore
+    freqs = torch.outer(t, freqs).float()  # type: ignore
+    freqs_cis = torch.polar(torch.ones_like(freqs), freqs)  # complex64
+    return freqs_cis
 
 def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor):
     ndim = x.ndim

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from tencentpretrain.utils.rope import get_ntk_alpha, update_freqs_cis
 from tencentpretrain.layers.multi_headed_attn import MultiHeadedAttention, ParallelMultiHeadedAttention
 from tencentpretrain.layers import *
 
@@ -17,6 +18,11 @@ class TransformerLayer(nn.Module):
         self.has_residual_attention = args.has_residual_attention
         self.use_logn_attn = args.use_logn_attn
         self.max_seq_length = args.max_seq_length
+        self.use_dynamic_ntk = args.use_dynamic_ntk
+        self.hidden_size = args.hidden_size
+        self.heads_num = args.heads_num
+        self.seq_len_cached = self.max_seq_length * 2
+        self.ntk_alpha_cached = 1.0
         if self.relative_position_embedding:
             self.relative_pos_emb = args.relative_pos_emb
         if self.rotary_position_embedding:
@@ -77,6 +83,13 @@ class TransformerLayer(nn.Module):
             position_bias = self.relative_pos_emb(hidden, hidden)
         else:
             position_bias = None
+
+        if seq_length > self.max_seq_length and self.use_dynamic_ntk:
+            ntk_alpha = get_ntk_alpha(seq_length, self.max_seq_length)
+            if seq_length > self.seq_len_cached or ntk_alpha != self.ntk_alpha_cached:
+                freqs_cis = update_freqs_cis(self.hidden_size // self.heads_num, seq_length * 2, ntk_alpha=ntk_alpha)
+                self.seq_len_cached = seq_length * 2
+                self.ntk_alpha_cached = ntk_alpha
 
         if self.rotary_position_embedding:
             freqs_cis = self.freqs_cis[:seq_length].to(hidden.device)
