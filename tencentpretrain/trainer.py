@@ -695,23 +695,22 @@ def worker(local_rank, gpu_ranks, args):
     if args.pipeline_model_parallel_size > 1:
         from deepspeed.pipe import PipelineModule, TiedLayerSpec, LayerSpec
         def get_model(model, args):
-            layers = [LayerSpec(EmbeddingPipe, args,model=model),
-                    *[LayerSpec(ParallelTransformerLayerPipe, args,model=model, layer_idx=idx) for idx in
+            layers = [LayerSpec(EmbeddingPipe, args, model=model),
+                    *[LayerSpec(ParallelTransformerLayerPipe, args, model=model, layer_idx=idx) for idx in
                         range(args.layers_num)],
-                    LayerSpec(TargetPipe, args=args,model=model)
-                    ]
+                    LayerSpec(TargetPipe, args=args, model=model)]
             return layers
-        layers = get_model(model_for_training,args)
+        layers = get_model(model_for_training, args)
         from deepspeed.runtime.pipe.topology import PipeModelDataParallelTopology
         topo = PipeModelDataParallelTopology(num_pp=mpu.get_pipeline_model_parallel_world_size(),
                                              num_mp=mpu.get_tensor_model_parallel_world_size(),
                                              num_dp=mpu.get_data_parallel_world_size())
 
-        model_for_training=PipelineModule(layers=layers, 
-                                          num_stages=args.pipeline_model_parallel_size, 
-                                          activation_checkpoint_interval=args.deepspeed_checkpoint_layers_num,
-                                          loss_fn=CrossEntropy,
-                                          checkpointable_layers=['ParallelTransformerLayerPipe'], topology=topo)
+        model_for_training = PipelineModule(layers=layers,
+                                            num_stages=args.pipeline_model_parallel_size,
+                                            activation_checkpoint_interval=args.deepspeed_checkpoint_layers_num,
+                                            loss_fn=CrossEntropy,
+                                            checkpointable_layers=['ParallelTransformerLayerPipe'], topology=topo)
 
     # Build optimizer.
     custom_optimizer, custom_scheduler, optimizer_grouped_parameters = init_optimizer(args, model_for_training)

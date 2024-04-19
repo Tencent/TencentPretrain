@@ -130,7 +130,7 @@ class TransformerEncoder(nn.Module):
                 mpu.reset_checkpointed_activations_memory_buffer()
             l = 0
             while l < self.layers_num:
-                inputs = checkpointing.checkpoint(custom(l, l + self.deepspeed_checkpoint_layers_num), inputs)
+                inputs = checkpointing.checkpoint(custom(l, l + self.deepspeed_checkpoint_layers_num), *inputs)
                 l += self.deepspeed_checkpoint_layers_num
         else:
             for i in range(self.layers_num):
