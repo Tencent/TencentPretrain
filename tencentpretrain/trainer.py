@@ -109,7 +109,7 @@ def init_optimizer(args, model_for_training):
             if 'lora' not in n:
                 p.requires_grad = False
     else:
-        no_decay = ["bias", "gamma", "beta"]
+        no_decay = ["bias", "gamma", "beta", "layer_norm.weight", "layer_norm_1.weight", "layer_norm_2.weight"]
         optimizer_grouped_parameters = [
             {"params": [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], "weight_decay": 0.01},
             {"params": [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], "weight_decay": 0.0}
