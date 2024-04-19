@@ -56,6 +56,7 @@ class Dataloader(object):
 
 class BertDataloader(Dataloader):
     def __iter__(self):
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
@@ -107,6 +108,7 @@ class BertDataloader(Dataloader):
 
 class MlmDataloader(Dataloader):
     def __iter__(self):
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
@@ -161,6 +163,7 @@ class AlbertDataloader(BertDataloader):
 
 class LmDataloader(Dataloader):
     def __iter__(self):
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
@@ -194,6 +197,7 @@ class LmDataloader(Dataloader):
 
 class BilmDataloader(Dataloader):
     def __iter__(self):
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
@@ -229,6 +233,7 @@ class BilmDataloader(Dataloader):
 
 class MtDataloader(Dataloader):
     def __iter__(self):
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
@@ -269,6 +274,7 @@ class MtDataloader(Dataloader):
 
 class T5Dataloader(Dataloader):
     def __iter__(self):
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
@@ -358,6 +364,7 @@ class GsgDataloader(MtDataloader):
 
 class BartDataloader(Dataloader):
     def __iter__(self):
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
@@ -419,6 +426,7 @@ class BartDataloader(Dataloader):
 
 class ClsDataloader(Dataloader):
     def __iter__(self):
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
@@ -457,6 +465,7 @@ class ClsDataloader(Dataloader):
 
 class PrefixlmDataloader(Dataloader):
     def __iter__(self):
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
@@ -488,6 +497,7 @@ class PrefixlmDataloader(Dataloader):
 
 class ClsMlmDataloader(Dataloader):
     def __iter__(self):
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
@@ -623,6 +633,7 @@ class ViltDataloader(VisionDataloader):
         """
         from torchvision.io import read_image
         from torchvision.io.image import ImageReadMode
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
@@ -693,6 +704,7 @@ class ClipDataloader(VisionDataloader):
         """
         from torchvision.io import read_image
         from torchvision.io.image import ImageReadMode
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
@@ -768,7 +780,7 @@ class S2tDataloader(AudioDataloader):
     def __iter__(self):
         import torchaudio
         import torchaudio.compliance.kaldi as ta_kaldi
-
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         padding_vector = torch.FloatTensor(self.audio_feature_size * [self.padding_value] if self.audio_feature_size > 1 else self.padding_value).unsqueeze(0).cuda(self.local_rank)
         while True:
             while self._empty():
@@ -938,6 +950,7 @@ class DalleDataloader(VisionDataloader):
 
 class LlmSftDataloader(Dataloader):
     def __iter__(self):
+        assert self.vocab.get(PAD_TOKEN) is not None, 'Error: special tokens mapping is wrong.'
         while True:
             while self._empty():
                 self._fill_buf()
