@@ -110,9 +110,8 @@ def read_dataset(args, data_path, answer_path):
                     seg = [0] * len(src)
 
                     if len(src) < args.seq_length:
-                        pad_length = args.seq_length - len(src)
-                        src += [0] * pad_length
-                        seg += [0] * pad_length
+                        src += [0] * (args.seq_length - len(src))
+                        seg += [0] * (args.seq_length - len(seg))
 
                     dataset[-1][0].append(src)
                     dataset[-1][2].append(seg)
