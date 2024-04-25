@@ -135,9 +135,9 @@ class TransformerEncoder(nn.Module):
         else:
             for i in range(self.layers_num):
                 if self.parameter_sharing:
-                    inputs = self.transformer(inputs)
+                    inputs = self.transformer(*inputs)
                 else:
-                    inputs = self.transformer[i](inputs)
+                    inputs = self.transformer[i](*inputs)
 
         hidden = inputs[0]
 
