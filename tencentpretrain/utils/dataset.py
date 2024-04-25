@@ -80,10 +80,10 @@ class Dataset(object):
             pool.join()
             async_results = [res.get() for res in async_results]
             if async_results[0] is not None:
-                num_sample = sum([res[0] for res in async_results])
-                num_tokens = sum([res[1] for res in async_results])
-                print("Number of valid samples:", num_sample)
-                print("Total number of tokens:", num_tokens)
+                samples_num = sum([res[0] for res in async_results])
+                tokens_num = sum([res[1] for res in async_results])
+                print("Number of samples:", samples_num)
+                print("Total number of tokens:", tokens_num)
 
         # Merge datasets.
         merge_dataset(self.dataset_path, workers_num)
@@ -255,7 +255,7 @@ class MlmDataset(Dataset):
                     pos += 1
 
                     document = [self.vocab.get(CLS_TOKEN)] + self.tokenizer.convert_tokens_to_ids(
-                        self.tokenizer.tokenize(line)) + [self.vocab.get(SEP_TOKEN)]
+                                self.tokenizer.tokenize(line)) + [self.vocab.get(SEP_TOKEN)]
 
                     if self.full_sentences:
                         if len(document) > 0:
@@ -1067,8 +1067,8 @@ class DalleDataset(FileWithTextDataset):
 class LlmSftDataset(Dataset):
     def worker(self, proc_id, start, end):
         print("Worker %d is building dataset ... " % proc_id)
-        num_samples = 0
-        num_tokens = 0
+        samples_num = 0
+        tokens_num = 0
         set_seed(self.seed)
         dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
         pos = 0
@@ -1102,10 +1102,10 @@ class LlmSftDataset(Dataset):
                     pad_num = self.seq_length - len(src)
 
                 pickle.dump(((src, pad_num), seg_pos), dataset_writer)
-                num_tokens += len(src)
-                num_samples += 1
+                tokens_num += len(src)
+                samples_num += 1
                 if pos >= end:
                     break
 
         dataset_writer.close()
-        return num_samples, num_tokens
+        return samples_num, tokens_num

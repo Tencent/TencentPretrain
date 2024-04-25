@@ -15,8 +15,8 @@ class Vocab(object):
         self.reserved_vocab_path = \
             os.path.abspath(os.path.join(os.path.dirname(__file__), "../../models/reserved_vocab.txt"))
         
-    def load(self, vocab_path, is_quiet=False, is_json=False):
-        if is_json:
+    def load(self, vocab_path, is_quiet=False, is_vocab_json=False):
+        if is_vocab_json:
             with open(vocab_path, 'r') as file:
                 voc = json.load(file)
                 sorted_voc = sorted(voc.items(), key=lambda x: x[1])
