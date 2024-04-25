@@ -507,8 +507,8 @@ class LlmPretrainDataset(Dataset):
 
     def worker(self, proc_id, start, end):
         print("Worker %d is building dataset ... " % proc_id)
-        num_samples = 0
-        num_tokens = 0
+        samples_num = 0
+        tokens_num = 0
 
         set_seed(self.seed)
         dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
@@ -550,8 +550,8 @@ class LlmPretrainDataset(Dataset):
                         pad_num = self.seq_length + 1 - len(src)
                         src = (src, pad_num)
                         pickle.dump((src, seg_pos), dataset_writer)
-                num_tokens += len(src)
-                num_samples += 1
+                tokens_num += len(src)
+                samples_num += 1
                 if pos >= end:
                     break
 
