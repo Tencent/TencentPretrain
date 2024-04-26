@@ -754,7 +754,6 @@ class S2tDataloader(AudioDataloader):
     def __iter__(self):
         import torchaudio
         import torchaudio.compliance.kaldi as ta_kaldi
-
         padding_vector = torch.FloatTensor(self.audio_feature_size * [self.padding_value] if self.audio_feature_size > 1 else self.padding_value).unsqueeze(0).cuda(self.local_rank)
         while True:
             while self._empty():
@@ -949,3 +948,7 @@ class LlmSftDataloader(Dataloader):
             yield torch.LongTensor(src), \
                   torch.LongTensor(tgt), \
                   torch.LongTensor(seg)
+
+
+class LlmPretrainDataloader(LmDataloader):
+    pass
