@@ -622,3 +622,10 @@ class HFPreTrainedTokenizer(Tokenizer):
 
     def decode(self, ids):
         return self.tokenizer.decode(ids)
+
+class QwenTokenizer(HFPreTrainedTokenizer):
+    def __init__(self, args):
+        super().__init__(args)
+
+    def convert_tokens_to_string(self, tokens):
+        return self.tokenizer.convert_tokens_to_string(tokens)
