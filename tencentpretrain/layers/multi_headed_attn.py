@@ -112,16 +112,15 @@ class MultiHeadedAttention(nn.Module):
         key = repeat_kv(key, self.repeat_num).transpose(1, 2)
         value = repeat_kv(value, self.repeat_num).transpose(1, 2)
 
-
-        if freqs_cis is not None:
-            query, key = apply_rotary_emb(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
-
-        key_size = key.size(2)
+        key_size = key.size(1)
         if key_size > self.max_seq_length and use_logn_attn and not self.training:
-            seq_start = key_size - query.size(2)
+            seq_start = key_size - query.size(1)
             seq_end = key_size
             logn_tensor = self.logn_tensor[:, seq_start:seq_end, :, :].type_as(query)
             query = query * logn_tensor.expand_as(query)
+
+        if freqs_cis is not None:
+            query, key = apply_rotary_emb(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
 
         scores = torch.matmul(query, key.transpose(-2, -1))
 
