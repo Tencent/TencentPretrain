@@ -48,7 +48,7 @@ for i in range(args.layers_num):
     output_model["encoder.transformer." + str(i) + ".layer_norm_2.weight"] = \
         input_model["transformer.h." + str(i) + ".ln_2.weight"]
 
-output_model["encoder.layer_norm.gamma"] = input_model["transformer.ln_f.weight"]
+output_model["encoder.layer_norm.weight"] = input_model["transformer.ln_f.weight"]
 output_model["target.lm.output_layer.weight"] = input_model["lm_head.weight"]
 
 torch.save(output_model, args.output_model_path)
