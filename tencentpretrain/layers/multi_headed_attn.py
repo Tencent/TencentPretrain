@@ -47,7 +47,7 @@ class MultiHeadedAttention(nn.Module):
             math.log(i, self.max_seq_length) if i > self.max_seq_length else 1
             for i in range(1, 32768)
         ]
-        logn_tensor = torch.tensor(logn_list)[None, :, None, None]
+        logn_tensor = torch.tensor(logn_list)[None, None, :, None]
         self.register_buffer("logn_tensor", logn_tensor, persistent=False)
         
         if lora_params is not None:
@@ -125,11 +125,11 @@ class MultiHeadedAttention(nn.Module):
             else:
                 query, key = apply_rotary_emb(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
 
-        key_size = key.size(1)
+        key_size = key.size(2)
         if key_size > self.max_seq_length and use_logn_attn and not self.training:
-            seq_start = key_size - query.size(1)
+            seq_start = key_size - query.size(2)
             seq_end = key_size
-            logn_tensor = self.logn_tensor[:, seq_start:seq_end, :, :].type_as(query)
+            logn_tensor = self.logn_tensor[:, :, seq_start:seq_end, :].type_as(query)
             query = query * logn_tensor.expand_as(query)
 
         scores = torch.matmul(query, key.transpose(-2, -1))
