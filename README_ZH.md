@@ -27,10 +27,10 @@ TencentPretrain有如下几方面优势:
 - __可复现__ TencentPretrain已在许多数据集上进行了测试，与原始预训练模型实现（例如BERT、GPT-2、ELMo、T5、CLIP）的表现相匹配
 - __模块化__ TencentPretrain使用解耦的模块化设计框架。框架分成Embedding、Encoder、Target等多个部分。各个部分之间有着清晰的接口并且每个部分包括了丰富的模块。可以对不同模块进行组合，构建出性质不同的预训练模型
 - __多模态__ TencentPretrain支持文本、图像、语音模态的预训练模型，并支持模态之间的翻译、融合等操作
-- __模型训练__ TencentPretrain支持CPU、单机单GPU、单机多GPU、多机多GPU训练模式，并支持使用DeepSpeed优化库进行超大模型训练
-- __模型仓库__ 我们维护并持续发布预训练模型。用户可以根据具体任务的要求，从中选择合适的预训练模型使用
+- __模型训练__ TencentPretrain支持CPU、单机GPU、多机多GPU训练模式，并支持使用DeepSpeed优化库进行超大模型训练
+- __模型仓库__ 我们维护并发布预训练模型。用户可以根据具体任务的要求，从中选择合适的预训练模型使用
 - __SOTA结果__ TencentPretrain支持全面的下游任务，包括文本/图像分类、序列标注、阅读理解、语音识别等，并提供了多个竞赛获胜解决方案
-- __预训练相关功能__ TencentPretrain提供了丰富的预训练相关的功能和优化，包括特征抽取、近义词检索、预训练模型转换、模型集成、文本生成等
+- __预训练相关功能__ TencentPretrain提供了丰富的预训练相关的功能，包括特征抽取、近义词检索、预训练模型转换、模型集成、文本生成等
 
 <br>
 
@@ -150,10 +150,10 @@ TencentPretrain使用解耦的设计框架，方便用户使用和扩展，项�
 ```
 TencentPretrain/
     |--tencentpretrain/
-    |    |--embeddings/ # 包括词向量模块
-    |    |--encoders/ # 包括编码器模块，例如RNN, CNN, Transformer
-    |    |--decoders/ # 包括解码器模块
-    |    |--targets/ # 包括目标任务模块，例如语言模型, 遮罩语言模型
+    |    |--embeddings/ # 包括词向量（embedding）部分的模块
+    |    |--encoders/ # 包括编码器（encoder）部分的模块，例如RNN, CNN, Transformer
+    |    |--decoders/ # 包括解码器（decoder）部分的模块
+    |    |--targets/ # 包括目标任务（target）部分的模块，例如语言模型, 遮罩语言模型
     |    |--layers/ # 包括常用的神经网络层
     |    |--models/ # 包括 model.py，用于组合词向量（embedding）、编码器（encoder）、目标任务（target）等模块
     |    |--utils/ # 包括常用的功能模块

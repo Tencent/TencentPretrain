@@ -17,7 +17,7 @@ def merge_dataset(dataset_path, workers_num):
     for i in range(workers_num):
         tmp_dataset_reader = open("dataset-tmp-" + str(i) + ".pt", "rb")
         while True:
-            tmp_data = tmp_dataset_reader.read(2**20)
+            tmp_data = tmp_dataset_reader.read(2 ** 20)
             if tmp_data:
                 dataset_writer.write(tmp_data)
             else:
@@ -69,13 +69,21 @@ class Dataset(object):
         if workers_num == 1:
             self.worker(0, 0, lines_num)
         else:
+            async_results = []
             pool = Pool(workers_num)
             for i in range(workers_num):
                 start = i * lines_num // workers_num
                 end = (i + 1) * lines_num // workers_num
-                pool.apply_async(func=self.worker, args=[i, start, end])
+                # pool.apply_async(func=self.worker, args=[i, start, end])
+                async_results.append(pool.apply_async(func=self.worker, args=[i, start, end]))
             pool.close()
             pool.join()
+            async_results = [res.get() for res in async_results]
+            if async_results[0] is not None:
+                samples_num = sum([res[0] for res in async_results])
+                tokens_num = sum([res[1] for res in async_results])
+                print("Number of samples:", samples_num)
+                print("Total number of tokens:", tokens_num)
 
         # Merge datasets.
         merge_dataset(self.dataset_path, workers_num)
@@ -211,7 +219,8 @@ class BertDataset(Dataset):
                         pad_num = self.seq_length - len(src)
 
                     if not self.dynamic_masking:
-                        src, tgt_mlm = mask_seq(src, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob, self.span_max_length)
+                        src, tgt_mlm = mask_seq(src, self.tokenizer, self.whole_word_masking, self.span_masking,
+                                                self.span_geo_prob, self.span_max_length)
                         src = (src, pad_num)
                         instance = (src, tgt_mlm, is_random_next, seg_pos)
                     else:
@@ -245,7 +254,8 @@ class MlmDataset(Dataset):
                     line = f.readline()
                     pos += 1
 
-                    document = [self.vocab.get(CLS_TOKEN)] + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(line)) + [self.vocab.get(SEP_TOKEN)]
+                    document = [self.vocab.get(CLS_TOKEN)] + self.tokenizer.convert_tokens_to_ids(
+                                self.tokenizer.tokenize(line)) + [self.vocab.get(SEP_TOKEN)]
 
                     if self.full_sentences:
                         if len(document) > 0:
@@ -293,7 +303,8 @@ class MlmDataset(Dataset):
             seg_pos = [len(src)]
 
             if not self.dynamic_masking:
-                src, tgt = mask_seq(src, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob, self.span_max_length)
+                src, tgt = mask_seq(src, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob,
+                                    self.span_max_length)
                 instance = ((src, 0), tgt, seg_pos)
             else:
                 instance = ((src, 0), seg_pos)
@@ -308,9 +319,10 @@ class MlmDataset(Dataset):
         seg_pos = [len(src)]
 
         pad_num = self.seq_length - len(src)
-        
+
         if not self.dynamic_masking:
-            src, tgt = mask_seq(src, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob, self.span_max_length)
+            src, tgt = mask_seq(src, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob,
+                                self.span_max_length)
             instance = ((src, pad_num), tgt, seg_pos)
         else:
             instance = ((src, pad_num), seg_pos)
@@ -417,7 +429,8 @@ class AlbertDataset(Dataset):
                         pad_num = self.seq_length - len(src)
 
                     if not self.dynamic_masking:
-                        src, tgt_mlm = mask_seq(src, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob, self.span_max_length)
+                        src, tgt_mlm = mask_seq(src, self.tokenizer, self.whole_word_masking, self.span_masking,
+                                                self.span_geo_prob, self.span_max_length)
                         src = (src, pad_num)
                         instance = (src, tgt_mlm, is_wrong_order, seg_pos)
                     else:
@@ -464,7 +477,7 @@ class LmDataset(Dataset):
                         seg_pos = [self.seq_length]
                         src = (src, 0)
                         pickle.dump((src, seg_pos), dataset_writer)
-                    buffer = buffer[instances_num * (self.seq_length + 1): ]
+                    buffer = buffer[instances_num * (self.seq_length + 1):]
 
                 else:
                     instances_num = len(document) // (self.seq_length + 1)
@@ -486,6 +499,7 @@ class LmDataset(Dataset):
 
         dataset_writer.close()
 
+
 class LlmPretrainDataset(Dataset):
     def __init__(self, args, vocab, tokenizer):
         super(LlmPretrainDataset, self).__init__(args, vocab, tokenizer)
@@ -493,6 +507,9 @@ class LlmPretrainDataset(Dataset):
 
     def worker(self, proc_id, start, end):
         print("Worker %d is building dataset ... " % proc_id)
+        samples_num = 0
+        tokens_num = 0
+
         set_seed(self.seed)
         dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
         pos = 0
@@ -517,7 +534,7 @@ class LlmPretrainDataset(Dataset):
                         seg_pos = [self.seq_length]
                         src = (src, 0)
                         pickle.dump((src, seg_pos), dataset_writer)
-                    buffer = buffer[instances_num * (self.seq_length + 1): ]
+                    buffer = buffer[instances_num * (self.seq_length + 1):]
 
                 else:
                     instances_num = len(document) // (self.seq_length + 1)
@@ -533,7 +550,8 @@ class LlmPretrainDataset(Dataset):
                         pad_num = self.seq_length + 1 - len(src)
                         src = (src, pad_num)
                         pickle.dump((src, seg_pos), dataset_writer)
-
+                tokens_num += len(src)
+                samples_num += 1
                 if pos >= end:
                     break
 
@@ -675,7 +693,8 @@ class GsgDataset(BertDataset):
 
         while i < len(document):
             segment = document[i]
-            if i in mask_seq_list and len(tgt) + len(segment) < target_tgt_seq_length and len(src) + 1 < target_seq_length:
+            if i in mask_seq_list and len(tgt) + len(segment) < target_tgt_seq_length and len(
+                    src) + 1 < target_seq_length:
                 tgt = tgt + segment
                 src = src + [self.vocab.get(MASK_TOKEN)]
             elif i not in mask_seq_list and len(src) + len(segment) < target_seq_length:
@@ -884,7 +903,8 @@ class ClsMlmDataset(Dataset):
                 if len(line) == 2:
                     label = int(line[0])
                     text = line[1]
-                    src = [self.vocab.get(CLS_TOKEN)] + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text)) + [self.vocab.get(SEP_TOKEN)]
+                    src = [self.vocab.get(CLS_TOKEN)] + self.tokenizer.convert_tokens_to_ids(
+                        self.tokenizer.tokenize(text)) + [self.vocab.get(SEP_TOKEN)]
                     tgt_cls = label
                     seg_pos = [len(src)]
                 elif len(line) == 3:  # For sentence pair input.
@@ -920,7 +940,8 @@ class ClsMlmDataset(Dataset):
 
                 if not self.dynamic_masking:
                     src_single, pad_num = src
-                    src_single, tgt_mlm = mask_seq(src_single, self.tokenizer, self.whole_word_masking, self.span_masking, self.span_geo_prob, self.span_max_length)
+                    src_single, tgt_mlm = mask_seq(src_single, self.tokenizer, self.whole_word_masking,
+                                                   self.span_masking, self.span_geo_prob, self.span_max_length)
                     src = (src_single, pad_num)
                     instance = (src, tgt_mlm, tgt_cls, seg_pos)
                 else:
@@ -1046,6 +1067,8 @@ class DalleDataset(FileWithTextDataset):
 class LlmSftDataset(Dataset):
     def worker(self, proc_id, start, end):
         print("Worker %d is building dataset ... " % proc_id)
+        samples_num = 0
+        tokens_num = 0
         set_seed(self.seed)
         dataset_writer = open("dataset-tmp-" + str(proc_id) + ".pt", "wb")
         pos = 0
@@ -1079,7 +1102,10 @@ class LlmSftDataset(Dataset):
                     pad_num = self.seq_length - len(src)
 
                 pickle.dump(((src, pad_num), seg_pos), dataset_writer)
+                tokens_num += len(src)
+                samples_num += 1
                 if pos >= end:
                     break
 
         dataset_writer.close()
+        return samples_num, tokens_num

@@ -4,6 +4,7 @@ from tencentpretrain.utils.rope import get_ntk_alpha, update_freqs_cis
 from tencentpretrain.layers.multi_headed_attn import MultiHeadedAttention, ParallelMultiHeadedAttention
 from tencentpretrain.layers import *
 
+
 class TransformerLayer(nn.Module):
     """
     Transformer layer mainly consists of two parts:
@@ -62,7 +63,7 @@ class TransformerLayer(nn.Module):
         self.layer_norm_1 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
         self.layer_norm_2 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
 
-    def forward(self, inputs):
+    def forward(self, *inputs):
 
         """
         Args:
@@ -72,7 +73,7 @@ class TransformerLayer(nn.Module):
         Returns:
             output: [batch_size x seq_length x hidden_size]
         """
-        if len(inputs)==2:
+        if len(inputs) == 2:
             hidden, mask = inputs
             prev_attn = None
         else:
@@ -155,7 +156,7 @@ class ParallelTransformerLayer(nn.Module):
 
         self.self_attn = ParallelMultiHeadedAttention(
             args.hidden_size, args.heads_num, attention_head_size, local_kv_heads_num, args.dropout, has_bias=has_bias,
-            with_scale = with_scale, lora_params=lora_params, layer_number=layer_number
+            with_scale=with_scale, lora_params=lora_params, layer_number=layer_number
         )
         self.dropout_1 = nn.Dropout(args.dropout)
 
@@ -169,7 +170,7 @@ class ParallelTransformerLayer(nn.Module):
         self.layer_norm_1 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
         self.layer_norm_2 = str2layernorm[args.layernorm](args.hidden_size, eps=args.layernorm_eps)
 
-    def forward(self, inputs):
+    def forward(self, *inputs):
 
         """
         Args:
@@ -180,7 +181,7 @@ class ParallelTransformerLayer(nn.Module):
             output: [batch_size x seq_length x hidden_size]
         """
 
-        if len(inputs)==2:
+        if len(inputs) == 2:
             hidden, mask = inputs
             prev_attn = None
         else:
@@ -239,7 +240,7 @@ class ParallelTransformerLayerPipe(nn.Module):
         mask = mask.repeat(batch_size, 1, 1, 1)
         return mask
 
-    def forward(self, inputs):
+    def forward(self, *inputs):
 
         """
         Args:
@@ -250,7 +251,7 @@ class ParallelTransformerLayerPipe(nn.Module):
             output: [batch_size x seq_length x hidden_size]
         """
 
-        if len(inputs)==2:
+        if len(inputs) == 2:
             hidden, seg = inputs
             prev_attn = None
         else:
@@ -258,7 +259,7 @@ class ParallelTransformerLayerPipe(nn.Module):
         batch_size, seq_length, _ = hidden.size()
         mask = self.generate_mask(seq_length, batch_size, hidden.device)
         layer_inputs = hidden, mask, prev_attn
-        outputs = self.layer(layer_inputs)
+        outputs = self.layer(*layer_inputs)
 
         if self.has_residual_attention:
             hidden, mask, prev_attn_out = outputs
