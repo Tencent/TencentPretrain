@@ -7,7 +7,8 @@ from tencentpretrain.utils.adversarial import *
 
 str2tokenizer = {"char": CharTokenizer, "space": SpaceTokenizer, "bert": BertTokenizer,
                  "bpe": BPETokenizer, "xlmroberta": XLMRobertaTokenizer, "image": ImageTokenizer,
-                 "text_image": TextImageTokenizer, "virtual": VirtualTokenizer, "hfpretrained": HFPreTrainedTokenizer}
+                 "text_image": TextImageTokenizer, "virtual": VirtualTokenizer, "hfpretrained": HFPreTrainedTokenizer,
+                 "clip": ClipTokenizer}
 str2dataset = {"bert": BertDataset, "lm": LmDataset, "mlm": MlmDataset,
                "bilm": BilmDataset, "albert": AlbertDataset, "mt": MtDataset,
                "t5": T5Dataset, "gsg": GsgDataset, "bart": BartDataset,
@@ -35,7 +36,8 @@ str2scheduler = {"linear": get_linear_schedule_with_warmup, "cosine": get_cosine
 str2adv = {"fgm": FGM, "pgd": PGD}
 
 __all__ = ["CharTokenizer", "SpaceTokenizer", "BertTokenizer", "BPETokenizer", "XLMRobertaTokenizer",
-           "ImageTokenizer", "TextImageTokenizer", "str2tokenizer",
+           "ImageTokenizer", "TextImageTokenizer", "VirtualTokenizer", "HFPreTrainedTokenizer",
+           "ClipTokenizer", "str2tokenizer",
            "BertDataset", "LmDataset", "MlmDataset", "BilmDataset",
            "AlbertDataset", "MtDataset", "T5Dataset", "GsgDataset",
            "BartDataset", "ClsDataset", "PrefixlmDataset", "ClsMlmDataset",
