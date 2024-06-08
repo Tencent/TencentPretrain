@@ -64,3 +64,18 @@ def apply_rotary_pos_emb(t: torch.Tensor, freqs: list[torch.Tensor, torch.Tensor
     sin = sin.to(t_rot.device)
     t_rot = (t_rot * cos) + (_rotate_half(t_rot) * sin)
     return torch.cat((t_rot, t_pass), dim=-1).type_as(t).transpose(1, 2)
+
+def apply_rotary_emb_with_ntk(
+        xq: torch.Tensor,
+        xk: torch.Tensor,
+        freqs_cis: list[torch.Tensor, torch.Tensor]
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    rotary_pos_emb = freqs_cis
+    seq_length = xq.size(1)
+    rotary_pos_emb = [i[:, -seq_length:, :, :] for i in rotary_pos_emb]
+    rotary_pos_emb = (rotary_pos_emb,) * 2
+    q_pos_emb, k_pos_emb = rotary_pos_emb
+    # Slice the pos emb for current inference
+    xq_out = apply_rotary_pos_emb(xq, q_pos_emb)
+    xk_out = apply_rotary_pos_emb(xk, k_pos_emb)
+    return xq_out, xk_out

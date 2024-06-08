@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 from tencentpretrain import mpu
-from tencentpretrain.utils.rope import apply_rotary_emb, apply_rotary_pos_emb
+from tencentpretrain.utils.rope import apply_rotary_emb, apply_rotary_emb_with_ntk
 from tencentpretrain.utils.lora import LoraLinear
 
 
@@ -115,13 +115,7 @@ class MultiHeadedAttention(nn.Module):
 
         if freqs_cis is not None:
             if use_dynamic_ntk:
-                rotary_pos_emb = freqs_cis
-                rotary_pos_emb = [i[:, -seq_length:, :, :] for i in rotary_pos_emb]
-                rotary_pos_emb = (rotary_pos_emb,) * 2
-                q_pos_emb, k_pos_emb = rotary_pos_emb
-                # Slice the pos emb for current inference
-                query = apply_rotary_pos_emb(query.transpose(1,2), q_pos_emb)
-                key = apply_rotary_pos_emb(key.transpose(1,2), k_pos_emb)
+                query, key = apply_rotary_emb_with_ntk(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
             else:
                 query, key = apply_rotary_emb(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
 

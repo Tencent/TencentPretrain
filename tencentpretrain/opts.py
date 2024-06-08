@@ -52,6 +52,10 @@ def model_opts(parser):
                         help="whether use alibi position embedding.")
     parser.add_argument("--layer_number_scale", action="store_true",
                         help="whether use layer number scaling.")
+    parser.add_argument("--use_logn_attn", action="store_true",
+                        help="whether use logn scaling.")
+    parser.add_argument("--use_dynamic_ntk", action="store_true",
+                        help="whether use dynamic ntk.")
 
     vision_opts(parser)
     audio_opts(parser)
