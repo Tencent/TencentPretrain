@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 from tencentpretrain import mpu
-from tencentpretrain.utils.rope import apply_rotary_emb
+from tencentpretrain.utils.rope import apply_rotary_emb, apply_rotary_emb_with_ntk
 from tencentpretrain.utils.lora import LoraLinear
 
 
@@ -26,7 +26,7 @@ class MultiHeadedAttention(nn.Module):
     self-attention refers to https://arxiv.org/pdf/1706.03762.pdf
     """
 
-    def __init__(self, hidden_size, heads_num, attention_head_size, local_kv_heads_num, dropout, has_bias=True, with_scale=True,
+    def __init__(self, hidden_size, heads_num, attention_head_size, local_kv_heads_num, dropout, max_seq_length, has_bias=True, has_attention_bias=None, with_scale=True,
                  lora_params=None, layer_number=None):
         super(MultiHeadedAttention, self).__init__()
         self.heads_num = heads_num
@@ -41,6 +41,15 @@ class MultiHeadedAttention(nn.Module):
         assert heads_num % self.local_kv_heads_num == 0, "heads_num should be divisible by n_local_kv_heads"
         self.repeat_num = self.heads_num // self.local_kv_heads_num
 
+        self.max_seq_length = max_seq_length
+
+        logn_list = [
+            math.log(i, self.max_seq_length) if i > self.max_seq_length else 1
+            for i in range(1, 32768)
+        ]
+        logn_tensor = torch.tensor(logn_list)[None, None, :, None]
+        self.register_buffer("logn_tensor", logn_tensor, persistent=False)
+        
         if lora_params is not None:
 
             self.linear_layers = nn.ModuleList(
@@ -53,8 +62,9 @@ class MultiHeadedAttention(nn.Module):
                              lora_dropout=lora_params['lora_dropout'], bias=has_bias)]
             )
         else:
+            has_attention_bias = has_attention_bias if has_attention_bias is not None else has_bias
             self.linear_layers = nn.ModuleList(
-                [nn.Linear(hidden_size, self.inner_hidden_size, bias=has_bias) if i==0 else nn.Linear(hidden_size, self.kv_embed_dim, bias=has_bias) for i in range(3)]
+                [nn.Linear(hidden_size, self.inner_hidden_size, bias=has_attention_bias) if i==0 else nn.Linear(hidden_size, self.kv_embed_dim, bias=has_attention_bias) for i in range(3)]
             )
         self.dropout = nn.Dropout(dropout)
         self.final_linear = nn.Linear(self.inner_hidden_size, hidden_size, bias=has_bias)
@@ -66,7 +76,7 @@ class MultiHeadedAttention(nn.Module):
             self.layer_number = None
 
     def forward(self, key, value, query, mask, position_bias=None, has_residual_attention=False, prev_attn=None,
-                freqs_cis=None, alibi=None):
+                freqs_cis=None, alibi=None, use_logn_attn=False, use_dynamic_ntk=False):
         """
         Args:
             key: [batch_size x seq_length x hidden_size]
@@ -103,9 +113,18 @@ class MultiHeadedAttention(nn.Module):
         key = repeat_kv(key, self.repeat_num).transpose(1, 2)
         value = repeat_kv(value, self.repeat_num).transpose(1, 2)
 
-
         if freqs_cis is not None:
-            query, key = apply_rotary_emb(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
+            if use_dynamic_ntk:
+                query, key = apply_rotary_emb_with_ntk(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
+            else:
+                query, key = apply_rotary_emb(query.transpose(1,2), key.transpose(1,2), freqs_cis=freqs_cis)
+
+        key_size = key.size(2)
+        if key_size > self.max_seq_length and use_logn_attn and not self.training:
+            seq_start = key_size - query.size(2)
+            seq_end = key_size
+            logn_tensor = self.logn_tensor[:, :, seq_start:seq_end, :].type_as(query)
+            query = query * logn_tensor.expand_as(query)
 
         scores = torch.matmul(query, key.transpose(-2, -1))
 

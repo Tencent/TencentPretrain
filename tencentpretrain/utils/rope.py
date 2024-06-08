@@ -1,4 +1,5 @@
 import torch
+import math
 from typing import Tuple
 
 def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0):
@@ -8,6 +9,24 @@ def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0):
     freqs_cis = torch.polar(torch.ones_like(freqs), freqs)  # complex64
     return freqs_cis
 
+def get_ntk_alpha(true_seq_len, max_seq_length):
+    context_value = math.log(true_seq_len / max_seq_length, 2) + 1
+    ntk_alpha = 2 ** math.ceil(context_value) - 1
+    ntk_alpha = max(ntk_alpha, 1)
+    return ntk_alpha
+
+def update_freqs_cis(dim: int, end: int, theta: float = 10000.0, ntk_alpha: float = 1.0):
+    theta = theta * ntk_alpha ** (dim / (dim - 2))
+    freqs = 1.0 / (theta ** (torch.arange(0, dim, 2).float() / dim))
+    seq = torch.arange(end, device=freqs.device)
+    freqs = torch.outer(seq.type_as(freqs), freqs)
+    emb = torch.cat((freqs, freqs), dim=-1)
+
+    from einops import rearrange
+    emb = rearrange(emb, "n d -> 1 n 1 d")
+
+    cos, sin = emb.cos(), emb.sin()
+    return [cos[:, :end], sin[:, :end]]
 
 def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor):
     ndim = x.ndim
@@ -28,3 +47,35 @@ def apply_rotary_emb(
     xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
     xk_out = torch.view_as_real(xk_ * freqs_cis).flatten(3)
     return xq_out.type_as(xq).transpose(1,2), xk_out.type_as(xk).transpose(1,2)
+
+def _rotate_half(x: torch.Tensor):
+    from einops import rearrange
+
+    x = rearrange(x, "... (j d) -> ... j d", j=2)
+    x1, x2 = x.unbind(dim=-2)
+    return torch.cat((-x2, x1), dim=-1)
+
+def apply_rotary_pos_emb(t: torch.Tensor, freqs: list[torch.Tensor, torch.Tensor]):
+    rot_dim = freqs[0].shape[-1]
+    cos, sin = freqs
+    t_float = t.float()
+    t_rot, t_pass = t_float[..., :rot_dim], t_float[..., rot_dim:]
+    cos = cos.to(t_rot.device)
+    sin = sin.to(t_rot.device)
+    t_rot = (t_rot * cos) + (_rotate_half(t_rot) * sin)
+    return torch.cat((t_rot, t_pass), dim=-1).type_as(t).transpose(1, 2)
+
+def apply_rotary_emb_with_ntk(
+        xq: torch.Tensor,
+        xk: torch.Tensor,
+        freqs_cis: list[torch.Tensor, torch.Tensor]
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    rotary_pos_emb = freqs_cis
+    seq_length = xq.size(1)
+    rotary_pos_emb = [i[:, -seq_length:, :, :] for i in rotary_pos_emb]
+    rotary_pos_emb = (rotary_pos_emb,) * 2
+    q_pos_emb, k_pos_emb = rotary_pos_emb
+    # Slice the pos emb for current inference
+    xq_out = apply_rotary_pos_emb(xq, q_pos_emb)
+    xk_out = apply_rotary_pos_emb(xk, k_pos_emb)
+    return xq_out, xk_out

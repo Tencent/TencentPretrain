@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from tencentpretrain.utils.rope import get_ntk_alpha, update_freqs_cis
 from tencentpretrain.layers.multi_headed_attn import MultiHeadedAttention, ParallelMultiHeadedAttention
 from tencentpretrain.layers import *
 
@@ -16,10 +17,18 @@ class TransformerLayer(nn.Module):
         self.relative_position_embedding = args.relative_position_embedding
         self.rotary_position_embedding = args.rotary_position_embedding
         self.has_residual_attention = args.has_residual_attention
+        self.use_logn_attn = args.use_logn_attn
+        self.use_dynamic_ntk = args.use_dynamic_ntk
+
         if self.relative_position_embedding:
             self.relative_pos_emb = args.relative_pos_emb
         if self.rotary_position_embedding:
             self.freqs_cis = args.freqs_cis
+            if self.use_dynamic_ntk:
+                self.max_seq_length = args.max_seq_length
+                self.attention_head_size = args.hidden_size // args.heads_num
+                self.seq_len_cached = 0
+                self.ntk_alpha_cached = 1.0
 
         if hasattr(args, "attention_head_size"):
             attention_head_size = args.attention_head_size
@@ -32,6 +41,7 @@ class TransformerLayer(nn.Module):
             local_kv_heads_num = args.heads_num
 
         has_bias = bool(1 - args.remove_transformer_bias)
+        has_attention_bias = bool(1 - args.remove_attention_bias) if hasattr(args, "remove_attention_bias") else has_bias
         with_scale = bool(1 - args.remove_attention_scale)
 
         # Multi-headed self-attention.
@@ -40,7 +50,7 @@ class TransformerLayer(nn.Module):
             lora_params = args.lora_params
 
         self.self_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, local_kv_heads_num, args.dropout, has_bias=has_bias,
+            args.hidden_size, args.heads_num, attention_head_size, local_kv_heads_num, args.dropout, args.max_seq_length, has_bias=has_bias, has_attention_bias=has_attention_bias,
             with_scale=with_scale, lora_params=lora_params, layer_number=layer_number
         )
         self.dropout_1 = nn.Dropout(args.dropout)
@@ -77,14 +87,24 @@ class TransformerLayer(nn.Module):
         else:
             position_bias = None
 
-        if self.rotary_position_embedding:
+        if self.rotary_position_embedding and self.use_dynamic_ntk:
+            ntk_alpha = get_ntk_alpha(seq_length, self.max_seq_length) if seq_length > self.max_seq_length else 1.0
+            if seq_length > self.seq_len_cached or ntk_alpha != self.ntk_alpha_cached:
+                self.freqs_cis = update_freqs_cis(self.attention_head_size, seq_length * 2, ntk_alpha=ntk_alpha)
+                self.seq_len_cached = seq_length * 2
+                self.ntk_alpha_cached = ntk_alpha
+
+        if self.rotary_position_embedding and not self.use_dynamic_ntk:
             freqs_cis = self.freqs_cis[:seq_length].to(hidden.device)
+        elif self.use_dynamic_ntk:
+            cos, sin = self.freqs_cis
+            freqs_cis = [cos[:, :seq_length], sin[:, :seq_length]]
         else:
             freqs_cis = None
 
         if self.layernorm_positioning == "post":
             inter, prev_attn_out = self.self_attn(hidden, hidden, hidden, mask, position_bias, self.has_residual_attention,
-                                                  prev_attn, freqs_cis)
+                                                  prev_attn, freqs_cis, use_logn_attn=self.use_logn_attn, use_dynamic_ntk=self.use_dynamic_ntk)
             inter = self.dropout_1(inter)
             inter = self.layer_norm_1(inter + hidden)
             output = self.dropout_2(self.feed_forward(inter))
@@ -92,7 +112,7 @@ class TransformerLayer(nn.Module):
         else:
             inter = self.layer_norm_1(hidden)
             inter, prev_attn_out = self.self_attn(inter, inter, inter, mask, position_bias, self.has_residual_attention,
-                                                  prev_attn, freqs_cis)
+                                                  prev_attn, freqs_cis, use_logn_attn=self.use_logn_attn, use_dynamic_ntk=self.use_dynamic_ntk)
             inter = self.dropout_1(inter)
             hidden = hidden + inter
             output = self.layer_norm_2(hidden)
@@ -281,14 +301,14 @@ class TransformerDecoderLayer(nn.Module):
             lora_params = args.lora_params
 
         self.self_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, local_kv_heads_num, args.dropout, has_bias=has_bias,
+            args.hidden_size, args.heads_num, attention_head_size, local_kv_heads_num, args.dropout, args.max_seq_length, has_bias=has_bias,
             with_scale=with_scale, lora_params=lora_params
         )
         self.dropout_1 = nn.Dropout(args.dropout)
 
         # Multi-headed context-attention.
         self.context_attn = MultiHeadedAttention(
-            args.hidden_size, args.heads_num, attention_head_size, local_kv_heads_num, args.dropout, has_bias=has_bias,
+            args.hidden_size, args.heads_num, attention_head_size, local_kv_heads_num, args.dropout, args.max_seq_length, has_bias=has_bias,
             with_scale=with_scale, lora_params=lora_params
         )
         self.dropout_2 = nn.Dropout(args.dropout)

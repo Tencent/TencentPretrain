@@ -52,6 +52,10 @@ def model_opts(parser):
                         help="whether use alibi position embedding.")
     parser.add_argument("--layer_number_scale", action="store_true",
                         help="whether use layer number scaling.")
+    parser.add_argument("--use_logn_attn", action="store_true",
+                        help="whether use logn scaling.")
+    parser.add_argument("--use_dynamic_ntk", action="store_true",
+                        help="whether use dynamic ntk.")
 
     vision_opts(parser)
     audio_opts(parser)
@@ -176,7 +180,7 @@ def infer_opts(parser):
 
 def tokenizer_opts(parser):
     parser.add_argument("--tokenizer", choices=["bert", "bpe", "char", "space", "xlmroberta", "image", "text_image",
-                                                "virtual", "hfpretrained"], default="bert",
+                                                "virtual", "hfpretrained", "qwen"], default="bert",
                         help="Specify the tokenizer." 
                              "Original Google BERT uses bert tokenizer."
                              "Char tokenizer segments sentences into characters."
