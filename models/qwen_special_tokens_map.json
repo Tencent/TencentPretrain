@@ -1,0 +1,6 @@
+{
+  "pad_token": "<|endoftext|>",
+  "cls_token": "<|im_start|>",
+  "sep_token": "<|im_end|>",
+  "sentinel_token": "<|extra_0|>"
+}
