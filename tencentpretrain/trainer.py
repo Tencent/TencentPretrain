@@ -245,6 +245,16 @@ class Trainer(object):
 
             self.current_step += 1
 
+        if self.total_steps % self.save_checkpoint_steps != 0: 
+            if args.deepspeed:
+                if args.use_lora:
+                    if global_rank == 0:
+                        save_model(model, self.output_model_path + "-" + str(self.total_steps), args.use_lora)
+                else:
+                    model.save_checkpoint(self.output_model_path, str(self.total_steps))
+            else:
+                save_model(model, self.output_model_path + "-" + str(self.total_steps), args.use_lora)
+
 
 class MlmTrainer(Trainer):
     def __init__(self, args):
